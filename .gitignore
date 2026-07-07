@@ -1,9 +1,25 @@
+# 环境变量（含敏感信息）
 .env
+
+# Python
 __pycache__/
 *.pyc
 .venv/
 venv/
+
+# Node
 node_modules/
 dist/
-backend/app/storage/uploads/
 frontend/.vite/
+
+# SQLite 数据库（本地自动生成）
+*.db
+*.db-shm
+*.db-wal
+
+# ChromaDB 向量存储（本地自动生成）
+chroma_data/
+
+# 上传文件（本地运行时产生）
+backend/app/storage/uploads/
+backend/app/storage/exports/

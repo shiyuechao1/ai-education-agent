@@ -1,19 +1,43 @@
+# ==================== Web 框架 ====================
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
+
+# ==================== 数据库 ====================
 sqlalchemy==2.0.36
-pymysql==1.1.1
+# pymysql==1.1.1          # 仅 MySQL 时需要，SQLite 不需要
+
+# ==================== 认证 ====================
 python-multipart==0.0.20
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+bcrypt==4.0.1              # 锁定版本，passlib 不兼容 bcrypt 4.1+
+
+# ==================== 配置 & 工具 ====================
 pydantic-settings==2.7.1
 aiofiles==24.1.0
+
+# ==================== 文件导出 ====================
 reportlab==4.2.5
+
+# ==================== LangChain & RAG ====================
 langchain==0.3.14
 langchain-community==0.3.14
 langchain-text-splitters==0.3.4
 langchain-openai==0.2.14
-langchain-milvus==0.1.8
-pymilvus==2.5.3
-dashscope==1.20.14
-reportlab==4.2.5
+
+# 向量数据库 — ChromaDB（本地零配置）
+chromadb==0.5.23
+langchain-chroma==0.2.0
+
+# 本地 Embedding — CPU 推理，离线可用
+sentence-transformers==3.3.1
+
+# ==================== 可选：千问 API ====================
+# dashscope==1.20.14      # 使用千问 LLM 时需要
+
+# ==================== 可选：Milvus（生产环境） ====================
+# langchain-milvus==0.1.8
+# pymilvus==2.5.3
+
+# ==================== 图像处理 ====================
 pillow==10.3.0

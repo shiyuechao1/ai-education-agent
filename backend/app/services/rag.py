@@ -1,76 +1,137 @@
+"""
+LangChain + ChromaDB RAG 服务。
+
+处理流程：
+1. 解析上传资料，按文件类型提取文本（PDF / Word / TXT / MD）。
+2. 清洗空白字符与异常片段。
+3. 使用 RecursiveCharacterTextSplitter 分块（chunk_size=800, overlap=120）。
+4. 使用 Embedding 模型向量化后写入 ChromaDB。
+5. 检索时取 top-k 文档，通过关键词命中重排优先保留最相关的片段。
+6. 若检索不到有效上下文，触发拒答逻辑，避免脱离课程知识库乱答。
+
+Embedding 策略：
+- "local"：使用本地 sentence-transformers 模型（零 API 调用，离线可用）
+- "dashscope"：使用千问 DashScope Embedding API
+"""
 from pathlib import Path
 from typing import Any
 
 from app.core.config import get_settings
 from app.services.llm import invoke_text
 
-
 settings = get_settings()
 
 
-class RagService:
-    """LangChain + Milvus RAG service.
+def _get_embeddings():
+    """根据配置返回 Embedding 实例。
 
-    处理流程：
-    1. 解析上传资料，按文件类型提取文本。
-    2. 清洗空白字符与异常片段。
-    3. 使用 RecursiveCharacterTextSplitter 分块。
-    4. 使用 DashScope Embedding 写入 Milvus。
-    5. 检索时取 top-k 文档，并由简单重排逻辑优先保留关键词命中高的片段。
-    6. 若检索不到有效上下文，触发拒答逻辑，避免脱离课程知识库乱答。
+    - local: HuggingFaceEmbeddings（本地 CPU 推理，离线可用）
+    - dashscope: DashScopeEmbeddings（需千问 API Key）
+    """
+    if settings.embedding_provider == "dashscope" and settings.qwen_api_key:
+        from langchain_community.embeddings import DashScopeEmbeddings
+
+        return DashScopeEmbeddings(dashscope_api_key=settings.qwen_api_key)
+
+    # 默认走本地 Embedding
+    from langchain_community.embeddings import HuggingFaceEmbeddings
+
+    return HuggingFaceEmbeddings(
+        model_name=settings.local_embedding_model,
+        model_kwargs={"device": "cpu"},
+        encode_kwargs={"normalize_embeddings": True},
+    )
+
+
+class RagService:
+    """LangChain + ChromaDB RAG service。
+
+    使用方法：
+        rag = RagService()
+        rag.ingest_file(course_id=1, file_id=10, file_path="/tmp/doc.pdf", filename="数学第一章.pdf")
+        result = rag.answer(course_id=1, question="什么是勾股定理")
     """
 
     def _load_text(self, file_path: str) -> str:
+        """根据文件后缀解析文本。"""
         path = Path(file_path)
         suffix = path.suffix.lower()
+
         if suffix in {".txt", ".md"}:
             return path.read_text(encoding="utf-8", errors="ignore")
+
         if suffix == ".pdf":
             from langchain_community.document_loaders import PyPDFLoader
 
             return "\n".join(page.page_content for page in PyPDFLoader(str(path)).load())
+
+        if suffix == ".docx":
+            from langchain_community.document_loaders import Docx2txtLoader
+
+            return "\n".join(doc.page_content for doc in Docx2txtLoader(str(path)).load())
+
+        # 兜底：通用文件加载器
         from langchain_community.document_loaders import UnstructuredFileLoader
 
         return "\n".join(doc.page_content for doc in UnstructuredFileLoader(str(path)).load())
 
     def _clean(self, text: str) -> str:
+        """基础文本清洗：去空行、去首尾空白。"""
         return "\n".join(line.strip() for line in text.splitlines() if line.strip())
 
     def _vector_store(self):
-        from langchain_community.embeddings import DashScopeEmbeddings
-        from langchain_milvus import Milvus
+        """获取 ChromaDB 向量存储实例。
 
-        embeddings = DashScopeEmbeddings(dashscope_api_key=settings.qwen_api_key)
-        return Milvus(
-            embedding_function=embeddings,
-            collection_name=settings.milvus_collection,
-            connection_args={"uri": settings.milvus_uri},
-            auto_id=True,
+        每次调用重新实例化，ChromaLib 内部会复用持久化数据。
+        """
+        from langchain_chroma import Chroma
+
+        return Chroma(
+            embedding_function=_get_embeddings(),
+            collection_name="ai_education_knowledge",
+            persist_directory=str(settings.chroma_path),
         )
 
+    # ---------- 公开方法 ----------
+
     def ingest_file(self, *, course_id: int, file_id: int, file_path: str, filename: str) -> int:
-        if not settings.qwen_api_key:
-            return 0
+        """将文件解析、分块、写入 ChromaDB。
+
+        返回：写入的 chunk 数量；如果未配置 Embedding 则返回 0。
+        """
         from langchain_text_splitters import RecursiveCharacterTextSplitter
 
         text = self._clean(self._load_text(file_path))
+        if not text.strip():
+            return 0
+
         splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=120)
         docs = splitter.create_documents(
             [text],
-            metadatas=[{"course_id": course_id, "file_id": file_id, "filename": filename}],
+            metadatas=[{
+                "course_id": course_id,
+                "file_id": file_id,
+                "filename": filename,
+            }],
         )
         self._vector_store().add_documents(docs)
         return len(docs)
 
     def retrieve(self, *, course_id: int, question: str, top_k: int = 5) -> list[dict[str, Any]]:
-        if not settings.qwen_api_key:
-            return []
+        """从 ChromaDB 检索与问题最相关的课程文档片段。
+
+        策略：
+        1. 先拿 top_k * 2 条候选
+        2. 按问题关键词在文档中命中次数重排
+        3. 取 top_k 条非空结果
+        """
         store = self._vector_store()
         docs = store.similarity_search(
             question,
             k=top_k * 2,
-            expr=f"course_id == {course_id}",
+            filter={"course_id": course_id},
         )
+
         terms = set(question.lower().split())
         ranked = sorted(
             docs,
@@ -84,21 +145,32 @@ class RagService:
         ]
 
     def answer(self, *, course_id: int, question: str) -> dict[str, Any]:
+        """RAG 问答：检索 + 大模型生成回答。
+
+        返回：{"answer": str, "citations": list[dict]}
+        如果知识库无相关内容，触发拒答逻辑。
+        """
         contexts = self.retrieve(course_id=course_id, question=question)
         if not contexts:
             return {
                 "answer": "课程知识库中没有找到足够相关的内容，暂时无法基于资料回答该问题。",
                 "citations": [],
             }
+
         context_text = "\n\n".join(
             f"[{idx + 1}] {item['content']}" for idx, item in enumerate(contexts)
         )
-        prompt = f"""请只根据课程知识库回答问题。若资料不足，请明确说明不能回答。
-问题：{question}
-资料：
-{context_text}
-请给出简明回答，并在末尾标注引用编号。"""
-        return {"answer": invoke_text(prompt), "citations": [item["metadata"] for item in contexts]}
+        prompt = (
+            "请只根据课程知识库回答问题。若资料不足，请明确说明不能回答。\n"
+            f"问题：{question}\n"
+            f"资料：\n{context_text}\n"
+            "请给出简明回答，并在末尾标注引用编号。"
+        )
+        return {
+            "answer": invoke_text(prompt),
+            "citations": [item["metadata"] for item in contexts],
+        }
 
 
+# 全局单例 — 所有 API 模块共用同一实例
 rag_service = RagService()
