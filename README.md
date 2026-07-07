@@ -1,4 +1,4 @@
-# AI 教育智能备课与个性化学习辅导智能体
+# 毕业实习项目
 
 这是一个按 `demand.md` 生成的工程化项目，包含 Vue 前端、FastAPI 后端、MySQL 数据库脚本、LangChain + Milvus RAG 模块，以及 MCP 风格 Agent 工具封装。不使用 Docker。
 
