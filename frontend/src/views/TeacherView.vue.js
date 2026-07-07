@@ -22,6 +22,7 @@ const lesson = ref({ topic: '', objectives: '', duration_minutes: 45 });
 const lessonResult = ref(null);
 const bank = ref({
     name: '默认题库',
+    description: '',
     questions: [
         {
             type: 'choice',
@@ -122,9 +123,11 @@ async function createBank() {
     const { data } = await api.post('/assignments/banks', {
         course_id: courseId.value,
         name: bank.value.name,
+        description: bank.value.description,
         questions: []
     });
     bank.value.name = '';
+    bank.value.description = '';
     selectedQuestionBankId.value = data.id;
     selectedBankId.value = data.id;
     await refreshCourseData();
@@ -422,7 +425,7 @@ else if (__VLS_ctx.feature === 'lesson') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.pre, __VLS_intrinsicElements.pre)({});
     (__VLS_ctx.lessonResult || '生成结果将在这里展示');
 }
-else if (__VLS_ctx.feature === 'question-bank') {
+else if (__VLS_ctx.feature === 'question-bank-create') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
         ...{ class: "workspace-card" },
     });
@@ -432,33 +435,45 @@ else if (__VLS_ctx.feature === 'question-bank') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.h2, __VLS_intrinsicElements.h2)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "form-grid two" },
+        ...{ class: "bank-create-panel" },
     });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "form-stack" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.h3, __VLS_intrinsicElements.h3)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-        placeholder: "题库名称",
+        placeholder: "例如：第一章基础题库",
     });
     (__VLS_ctx.bank.name);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.textarea)({
+        value: (__VLS_ctx.bank.description),
+        placeholder: "输入题库适用章节、知识点范围或使用说明",
+    });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
         ...{ onClick: (__VLS_ctx.createBank) },
         type: "button",
+        ...{ class: "bank-create-submit" },
     });
     const __VLS_12 = {}.Plus;
     /** @type {[typeof __VLS_components.Plus, ]} */ ;
     // @ts-ignore
     const __VLS_13 = __VLS_asFunctionalComponent(__VLS_12, new __VLS_12({
-        size: (18),
+        size: (16),
     }));
     const __VLS_14 = __VLS_13({
-        size: (18),
+        size: (16),
     }, ...__VLS_functionalComponentArgsRest(__VLS_13));
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "form-stack" },
+}
+else if (__VLS_ctx.feature === 'question-add') {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
+        ...{ class: "workspace-card" },
     });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.h3, __VLS_intrinsicElements.h3)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "section-title" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.h2, __VLS_intrinsicElements.h2)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "form-stack compact" },
+    });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.select, __VLS_intrinsicElements.select)({
         value: (__VLS_ctx.selectedQuestionBankId),
     });
@@ -510,7 +525,9 @@ else if (__VLS_ctx.feature === 'question-bank') {
                             return;
                         if (!!(__VLS_ctx.feature === 'lesson'))
                             return;
-                        if (!(__VLS_ctx.feature === 'question-bank'))
+                        if (!!(__VLS_ctx.feature === 'question-bank-create'))
+                            return;
+                        if (!(__VLS_ctx.feature === 'question-add'))
                             return;
                         if (!(__VLS_ctx.bank.questions[0].type === 'choice'))
                             return;
@@ -533,7 +550,9 @@ else if (__VLS_ctx.feature === 'question-bank') {
                             return;
                         if (!!(__VLS_ctx.feature === 'lesson'))
                             return;
-                        if (!(__VLS_ctx.feature === 'question-bank'))
+                        if (!!(__VLS_ctx.feature === 'question-bank-create'))
+                            return;
+                        if (!(__VLS_ctx.feature === 'question-add'))
                             return;
                         if (!(__VLS_ctx.bank.questions[0].type === 'choice'))
                             return;
@@ -571,7 +590,9 @@ else if (__VLS_ctx.feature === 'question-bank') {
                         return;
                     if (!!(__VLS_ctx.feature === 'lesson'))
                         return;
-                    if (!(__VLS_ctx.feature === 'question-bank'))
+                    if (!!(__VLS_ctx.feature === 'question-bank-create'))
+                        return;
+                    if (!(__VLS_ctx.feature === 'question-add'))
                         return;
                     if (!!(__VLS_ctx.bank.questions[0].type === 'choice'))
                         return;
@@ -591,7 +612,9 @@ else if (__VLS_ctx.feature === 'question-bank') {
                         return;
                     if (!!(__VLS_ctx.feature === 'lesson'))
                         return;
-                    if (!(__VLS_ctx.feature === 'question-bank'))
+                    if (!!(__VLS_ctx.feature === 'question-bank-create'))
+                        return;
+                    if (!(__VLS_ctx.feature === 'question-add'))
                         return;
                     if (!!(__VLS_ctx.bank.questions[0].type === 'choice'))
                         return;
@@ -650,6 +673,9 @@ else if (__VLS_ctx.feature === 'question-bank-view') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
     (__VLS_ctx.questionBanks.length);
     (__VLS_ctx.bankQuestions.length);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "bank-manage-panel" },
+    });
     if (__VLS_ctx.questionBanks.length) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "bank-browser" },
@@ -666,7 +692,9 @@ else if (__VLS_ctx.feature === 'question-bank-view') {
                             return;
                         if (!!(__VLS_ctx.feature === 'lesson'))
                             return;
-                        if (!!(__VLS_ctx.feature === 'question-bank'))
+                        if (!!(__VLS_ctx.feature === 'question-bank-create'))
+                            return;
+                        if (!!(__VLS_ctx.feature === 'question-add'))
                             return;
                         if (!(__VLS_ctx.feature === 'question-bank-view'))
                             return;
@@ -691,7 +719,9 @@ else if (__VLS_ctx.feature === 'question-bank-view') {
                             return;
                         if (!!(__VLS_ctx.feature === 'lesson'))
                             return;
-                        if (!!(__VLS_ctx.feature === 'question-bank'))
+                        if (!!(__VLS_ctx.feature === 'question-bank-create'))
+                            return;
+                        if (!!(__VLS_ctx.feature === 'question-add'))
                             return;
                         if (!(__VLS_ctx.feature === 'question-bank-view'))
                             return;
@@ -763,7 +793,9 @@ else if (__VLS_ctx.feature === 'question-bank-view') {
                             return;
                         if (!!(__VLS_ctx.feature === 'lesson'))
                             return;
-                        if (!!(__VLS_ctx.feature === 'question-bank'))
+                        if (!!(__VLS_ctx.feature === 'question-bank-create'))
+                            return;
+                        if (!!(__VLS_ctx.feature === 'question-add'))
                             return;
                         if (!(__VLS_ctx.feature === 'question-bank-view'))
                             return;
@@ -890,7 +922,9 @@ else if (__VLS_ctx.feature === 'submission-records') {
                     return;
                 if (!!(__VLS_ctx.feature === 'lesson'))
                     return;
-                if (!!(__VLS_ctx.feature === 'question-bank'))
+                if (!!(__VLS_ctx.feature === 'question-bank-create'))
+                    return;
+                if (!!(__VLS_ctx.feature === 'question-add'))
                     return;
                 if (!!(__VLS_ctx.feature === 'question-bank-view'))
                     return;
@@ -980,7 +1014,9 @@ else if (__VLS_ctx.feature === 'submission-records') {
                                     return;
                                 if (!!(__VLS_ctx.feature === 'lesson'))
                                     return;
-                                if (!!(__VLS_ctx.feature === 'question-bank'))
+                                if (!!(__VLS_ctx.feature === 'question-bank-create'))
+                                    return;
+                                if (!!(__VLS_ctx.feature === 'question-add'))
                                     return;
                                 if (!!(__VLS_ctx.feature === 'question-bank-view'))
                                     return;
@@ -1031,7 +1067,9 @@ else if (__VLS_ctx.feature === 'submission-records') {
                                     return;
                                 if (!!(__VLS_ctx.feature === 'lesson'))
                                     return;
-                                if (!!(__VLS_ctx.feature === 'question-bank'))
+                                if (!!(__VLS_ctx.feature === 'question-bank-create'))
+                                    return;
+                                if (!!(__VLS_ctx.feature === 'question-add'))
                                     return;
                                 if (!!(__VLS_ctx.feature === 'question-bank-view'))
                                     return;
@@ -1113,10 +1151,12 @@ else {
 /** @type {__VLS_StyleScopedClasses['form-stack']} */ ;
 /** @type {__VLS_StyleScopedClasses['workspace-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['section-title']} */ ;
-/** @type {__VLS_StyleScopedClasses['form-grid']} */ ;
-/** @type {__VLS_StyleScopedClasses['two']} */ ;
+/** @type {__VLS_StyleScopedClasses['bank-create-panel']} */ ;
+/** @type {__VLS_StyleScopedClasses['bank-create-submit']} */ ;
+/** @type {__VLS_StyleScopedClasses['workspace-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['section-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-stack']} */ ;
-/** @type {__VLS_StyleScopedClasses['form-stack']} */ ;
+/** @type {__VLS_StyleScopedClasses['compact']} */ ;
 /** @type {__VLS_StyleScopedClasses['option-editor']} */ ;
 /** @type {__VLS_StyleScopedClasses['option-row']} */ ;
 /** @type {__VLS_StyleScopedClasses['answer-option']} */ ;
@@ -1128,6 +1168,7 @@ else {
 /** @type {__VLS_StyleScopedClasses['selected-answer']} */ ;
 /** @type {__VLS_StyleScopedClasses['workspace-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['section-title']} */ ;
+/** @type {__VLS_StyleScopedClasses['bank-manage-panel']} */ ;
 /** @type {__VLS_StyleScopedClasses['bank-browser']} */ ;
 /** @type {__VLS_StyleScopedClasses['bank-list']} */ ;
 /** @type {__VLS_StyleScopedClasses['bank-button']} */ ;

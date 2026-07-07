@@ -591,6 +591,64 @@ pre,
   font-size: 13px;
 }
 
+.question-bank-workspace {
+  display: grid;
+  gap: 20px;
+}
+
+.question-bank-workspace h3 {
+  margin: 0;
+}
+
+.bank-create-panel {
+  background: #f8fafb;
+  border: 1px solid #e3ebef;
+  border-radius: 9px;
+  display: grid;
+  gap: 12px;
+  max-width: 620px;
+  padding: 14px;
+}
+
+.bank-create-panel label {
+  color: #465661;
+  display: grid;
+  font-size: 14px;
+  font-weight: 700;
+  gap: 7px;
+}
+
+.bank-create-panel input {
+  max-width: 420px;
+}
+
+.bank-create-panel textarea {
+  max-width: 560px;
+  min-height: 86px;
+}
+
+.bank-create-submit {
+  min-height: 36px;
+  width: 120px;
+}
+
+.bank-create-row {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(220px, 1fr) 92px;
+}
+
+.bank-create-row input,
+.bank-create-row button {
+  min-height: 36px;
+}
+
+.bank-manage-panel {
+  display: grid;
+  gap: 12px;
+}
+
 .bank-browser {
   display: grid;
   gap: 18px;
@@ -712,6 +770,7 @@ pre,
 @media (max-width: 920px) {
   .shell,
   .form-grid.two,
+  .bank-create-row,
   .bank-browser,
   .answer-meta,
   .grading-box,

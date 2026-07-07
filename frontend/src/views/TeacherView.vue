@@ -24,6 +24,7 @@ const lesson = ref({ topic: '', objectives: '', duration_minutes: 45 })
 const lessonResult = ref<any>(null)
 const bank = ref({
   name: '默认题库',
+  description: '',
   questions: [
     {
       type: 'choice',
@@ -131,9 +132,11 @@ async function createBank() {
   const { data } = await api.post('/assignments/banks', {
     course_id: courseId.value,
     name: bank.value.name,
+    description: bank.value.description,
     questions: []
   })
   bank.value.name = ''
+  bank.value.description = ''
   selectedQuestionBankId.value = data.id
   selectedBankId.value = data.id
   await refreshCourseData()
@@ -341,84 +344,94 @@ onMounted(load)
     </div>
   </section>
 
-  <section v-else-if="feature === 'question-bank'" class="workspace-card">
+  <section v-else-if="feature === 'question-bank-create'" class="workspace-card">
     <div class="section-title">
-      <h2>题库管理</h2>
-      <span>创建题库并向现有题库添加题目</span>
+      <h2>添加题库</h2>
+      <span>创建课程题库</span>
     </div>
-    <div class="form-grid two">
-      <div class="form-stack">
-        <h3>添加题库</h3>
-        <input v-model="bank.name" placeholder="题库名称" />
-        <button type="button" @click="createBank"><Plus :size="18" />添加题库</button>
-      </div>
-      <div class="form-stack">
-        <h3>添加题目</h3>
+    <div class="bank-create-panel">
+      <label>
+        题库名称
+        <input v-model="bank.name" placeholder="例如：第一章基础题库" />
+      </label>
+      <label>
+        题库描述
+        <textarea v-model="bank.description" placeholder="输入题库适用章节、知识点范围或使用说明" />
+      </label>
+      <button type="button" class="bank-create-submit" @click="createBank"><Plus :size="16" />添加题库</button>
+    </div>
+  </section>
+
+  <section v-else-if="feature === 'question-add'" class="workspace-card">
+    <div class="section-title">
+      <h2>添加题目</h2>
+      <span>选择现有题库后录入题目</span>
+    </div>
+    <div class="form-stack compact">
         <select v-model.number="selectedQuestionBankId">
           <option :value="undefined">请选择题库</option>
           <option v-for="item in questionBanks" :key="item.id" :value="item.id">
             {{ item.name }} · {{ item.question_count }} 道题
           </option>
         </select>
-      <select v-model="bank.questions[0].type" @change="handleQuestionTypeChange">
-        <option value="choice">选择题</option>
-        <option value="blank">填空题</option>
-        <option value="judge">判断题</option>
-        <option value="short">简答题</option>
-      </select>
-      <textarea v-model="bank.questions[0].stem" placeholder="题干" />
-      <div v-if="bank.questions[0].type === 'choice'" class="option-editor">
-        <div v-for="(option, index) in bank.questions[0].options" :key="option.label" class="option-row">
+        <select v-model="bank.questions[0].type" @change="handleQuestionTypeChange">
+          <option value="choice">选择题</option>
+          <option value="blank">填空题</option>
+          <option value="judge">判断题</option>
+          <option value="short">简答题</option>
+        </select>
+        <textarea v-model="bank.questions[0].stem" placeholder="题干" />
+        <div v-if="bank.questions[0].type === 'choice'" class="option-editor">
+          <div v-for="(option, index) in bank.questions[0].options" :key="option.label" class="option-row">
+            <button
+              type="button"
+              class="answer-option"
+              :class="{ selected: bank.questions[0].answer === option.label }"
+              @click="setAnswer(option.label)"
+            >
+              {{ option.label }}
+            </button>
+            <input v-model="option.text" :placeholder="`选项 ${option.label} 内容`" />
+            <button
+              type="button"
+              class="secondary"
+              :disabled="bank.questions[0].options.length <= 2"
+              @click="removeChoiceOption(index)"
+            >
+              删除
+            </button>
+          </div>
+          <button type="button" class="secondary" @click="addChoiceOption"><Plus :size="18" />添加选项</button>
+        </div>
+        <div v-else-if="bank.questions[0].type === 'judge'" class="row">
           <button
             type="button"
             class="answer-option"
-            :class="{ selected: bank.questions[0].answer === option.label }"
-            @click="setAnswer(option.label)"
+            :class="{ selected: bank.questions[0].answer === 'true' }"
+            @click="setAnswer('true')"
           >
-            {{ option.label }}
+            正确
           </button>
-          <input v-model="option.text" :placeholder="`选项 ${option.label} 内容`" />
           <button
             type="button"
-            class="secondary"
-            :disabled="bank.questions[0].options.length <= 2"
-            @click="removeChoiceOption(index)"
+            class="answer-option"
+            :class="{ selected: bank.questions[0].answer === 'false' }"
+            @click="setAnswer('false')"
           >
-            删除
+            错误
           </button>
         </div>
-        <button type="button" class="secondary" @click="addChoiceOption"><Plus :size="18" />添加选项</button>
-      </div>
-      <div v-else-if="bank.questions[0].type === 'judge'" class="row">
-        <button
-          type="button"
-          class="answer-option"
-          :class="{ selected: bank.questions[0].answer === 'true' }"
-          @click="setAnswer('true')"
-        >
-          正确
-        </button>
-        <button
-          type="button"
-          class="answer-option"
-          :class="{ selected: bank.questions[0].answer === 'false' }"
-          @click="setAnswer('false')"
-        >
-          错误
-        </button>
-      </div>
-      <input v-model.number="bank.questions[0].score" type="number" placeholder="分值" />
-      <input
-        v-if="bank.questions[0].type === 'blank' || bank.questions[0].type === 'short'"
-        v-model="bank.questions[0].answer"
-        placeholder="参考答案"
-      />
-      <div v-else class="selected-answer">当前参考答案：{{ bank.questions[0].answer || '请点击上方按钮设置' }}</div>
-      <textarea v-model="bank.questions[0].analysis" placeholder="解析" />
+        <input v-model.number="bank.questions[0].score" type="number" placeholder="分值" />
+        <input
+          v-if="bank.questions[0].type === 'blank' || bank.questions[0].type === 'short'"
+          v-model="bank.questions[0].answer"
+          placeholder="参考答案"
+        />
+        <div v-else class="selected-answer">当前参考答案：{{ bank.questions[0].answer || '请点击上方按钮设置' }}</div>
+        <textarea v-model="bank.questions[0].analysis" placeholder="解析" />
         <button :disabled="!selectedQuestionBankId" @click="addQuestionToSelectedBank">
           <Plus :size="18" />添加题目到题库
         </button>
-      </div>
     </div>
   </section>
 
@@ -427,68 +440,70 @@ onMounted(load)
       <h2>题库查看</h2>
       <span>{{ questionBanks.length }} 个题库 · {{ bankQuestions.length }} 道题</span>
     </div>
-    <div v-if="questionBanks.length" class="bank-browser">
-      <aside class="bank-list">
-        <div
-          v-for="item in questionBanks"
-          :key="item.id"
-          class="bank-button"
-          :class="{ active: selectedBankId === item.id }"
-          @click="loadBankQuestions(item.id)"
-        >
-          <span>
-            <strong>{{ item.name }}</strong>
-            <span>{{ item.question_count }} 道题</span>
-          </span>
-          <button
-            type="button"
-            class="danger mini-button"
-            @click.stop="deleteQuestionBank(item.id)"
-          >
-            删除
-          </button>
-        </div>
-      </aside>
-      <div class="question-list">
-        <div class="bank-summary">
-          <div>
-            <p class="eyebrow">当前题库</p>
-            <h3>{{ selectedBank?.name }}</h3>
+    <div class="bank-manage-panel">
+        <div v-if="questionBanks.length" class="bank-browser">
+          <aside class="bank-list">
+            <div
+              v-for="item in questionBanks"
+              :key="item.id"
+              class="bank-button"
+              :class="{ active: selectedBankId === item.id }"
+              @click="loadBankQuestions(item.id)"
+            >
+              <span>
+                <strong>{{ item.name }}</strong>
+                <span>{{ item.question_count }} 道题</span>
+              </span>
+              <button
+                type="button"
+                class="danger mini-button"
+                @click.stop="deleteQuestionBank(item.id)"
+              >
+                删除
+              </button>
+            </div>
+          </aside>
+          <div class="question-list">
+            <div class="bank-summary">
+              <div>
+                <p class="eyebrow">当前题库</p>
+                <h3>{{ selectedBank?.name }}</h3>
+              </div>
+              <span class="badge success">{{ selectedBank?.question_count || 0 }} 道题</span>
+            </div>
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>题型</th>
+                  <th>题干</th>
+                  <th>选项</th>
+                  <th>答案</th>
+                  <th>分值</th>
+                  <th>解析</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="question in bankQuestions" :key="question.id">
+                  <td>{{ question.id }}</td>
+                  <td><span class="badge">{{ questionTypeName(question.type) }}</span></td>
+                  <td>{{ question.stem }}</td>
+                  <td>{{ formatOptions(question.options) }}</td>
+                  <td>{{ question.answer }}</td>
+                  <td>{{ question.score }}</td>
+                  <td>{{ question.analysis || '无' }}</td>
+                  <td>
+                    <button type="button" class="danger" @click="deleteQuestion(question.id)">删除</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div v-if="!bankQuestions.length" class="empty-state">当前题库还没有题目。</div>
           </div>
-          <span class="badge success">{{ selectedBank?.question_count || 0 }} 道题</span>
         </div>
-        <table class="table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>题型</th>
-              <th>题干</th>
-              <th>选项</th>
-              <th>答案</th>
-              <th>分值</th>
-              <th>解析</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="question in bankQuestions" :key="question.id">
-              <td>{{ question.id }}</td>
-              <td><span class="badge">{{ questionTypeName(question.type) }}</span></td>
-              <td>{{ question.stem }}</td>
-              <td>{{ formatOptions(question.options) }}</td>
-              <td>{{ question.answer }}</td>
-              <td>{{ question.score }}</td>
-              <td>{{ question.analysis || '无' }}</td>
-              <td>
-                <button type="button" class="danger" @click="deleteQuestion(question.id)">删除</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <div v-if="!bankQuestions.length" class="empty-state">当前题库还没有题目。</div>
-      </div>
+        <div v-else class="empty-state">当前课程暂无题库，请先到“添加题库”模块创建。</div>
     </div>
-    <div v-else class="empty-state">当前课程暂无题库，请先在“题库管理”中创建。</div>
   </section>
 
   <section v-else-if="feature === 'assignments'" class="workspace-card">
