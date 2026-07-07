@@ -1,0 +1,33 @@
+from app.models.entities import (
+    AgentTask,
+    Answer,
+    Assignment,
+    AssignmentQuestion,
+    ChatMessage,
+    ChatSession,
+    Course,
+    CourseMember,
+    Feedback,
+    KnowledgeFile,
+    Question,
+    QuestionBank,
+    Submission,
+    User,
+)
+
+__all__ = [
+    "AgentTask",
+    "Answer",
+    "Assignment",
+    "AssignmentQuestion",
+    "ChatMessage",
+    "ChatSession",
+    "Course",
+    "CourseMember",
+    "Feedback",
+    "KnowledgeFile",
+    "Question",
+    "QuestionBank",
+    "Submission",
+    "User",
+]
