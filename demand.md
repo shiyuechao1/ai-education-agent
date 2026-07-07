@@ -3,7 +3,7 @@
 1. 前端用vue完成
 2. 后端用python的fastapi完成
 3. 数据库使用mysql数据库，root的密码为33550336
-4. 模型使用千问大模型，api key为sk-ws-H.EMHMEPX.ObQX.MEQCIGORyDBr5a9M8ZDnxBKBNsCdUiCLspXxMl-WAVFheut3AiBAeFqQVFKuqN7ug5mJN6bt89-6FWcxd_gvIGXLw5bQug
+4. 模型使用千问大模型，api key为xxx
 5. rag实现使用langchain框架，向量数据库使用milvus
 6. agent使用mcp技术
 功能要求如下： 

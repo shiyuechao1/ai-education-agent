@@ -24,10 +24,11 @@ const courseForm = ref({
   name: '',
   description: '',
   teacher_id: undefined as number | undefined,
-  student_ids: ''
+  student_ids: [] as number[]
 })
 
 const teachers = computed(() => users.value.filter((item) => item.role === 'teacher'))
+const students = computed(() => users.value.filter((item) => item.role === 'student'))
 
 async function load() {
   const [userRes, courseRes, feedbackRes, statRes] = await Promise.all([
@@ -57,11 +58,20 @@ async function createCourse() {
     name: courseForm.value.name,
     description: courseForm.value.description,
     teacher_id: Number(courseForm.value.teacher_id),
-    student_ids: courseForm.value.student_ids.split(',').map((id) => Number(id.trim())).filter(Boolean)
+    student_ids: courseForm.value.student_ids
   })
   courseForm.value.name = ''
-  courseForm.value.student_ids = ''
+  courseForm.value.student_ids = []
   await load()
+}
+
+function toggleStudent(studentId: number) {
+  const selected = courseForm.value.student_ids
+  if (selected.includes(studentId)) {
+    courseForm.value.student_ids = selected.filter((id) => id !== studentId)
+    return
+  }
+  courseForm.value.student_ids = [...selected, studentId]
 }
 
 async function reply(item: any) {
@@ -123,7 +133,19 @@ onMounted(load)
           {{ user.name }} · {{ user.user_no }}
         </option>
       </select>
-      <input v-model="courseForm.student_ids" placeholder="学生 ID，用英文逗号分隔" />
+      <div class="student-picker">
+        <button
+          v-for="student in students"
+          :key="student.id"
+          type="button"
+          class="student-option"
+          :class="{ active: courseForm.student_ids.includes(student.id) }"
+          @click="toggleStudent(student.id)"
+        >
+          <strong>{{ student.name }}</strong>
+          <span>{{ student.user_no }} · {{ student.username }}</span>
+        </button>
+      </div>
       <button @click="createCourse"><Plus :size="18" />创建课程</button>
     </div>
   </section>

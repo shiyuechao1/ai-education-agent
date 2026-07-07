@@ -142,6 +142,23 @@ class SubmissionOut(BaseModel):
     submitted_at: datetime
 
 
+class AnswerResult(BaseModel):
+    question_id: int
+    type: QuestionTypeLiteral
+    stem: str
+    student_answer: str | None
+    image_path: str | None = None
+    reference_answer: str
+    is_correct: bool | None
+    score: float
+    max_score: float
+    analysis: str | None = None
+
+
+class SubmissionResult(SubmissionOut):
+    answers: list[AnswerResult]
+
+
 class ManualGrade(BaseModel):
     answer_id: int
     score: float = Field(ge=0)

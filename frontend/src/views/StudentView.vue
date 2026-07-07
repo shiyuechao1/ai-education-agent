@@ -15,6 +15,9 @@ const selectedAssignmentId = ref<number>()
 const questions = ref<any[]>([])
 const current = ref(0)
 const answers = ref<Record<number, string>>({})
+const answerImages = ref<Record<number, string>>({})
+const answerFileNames = ref<Record<number, string>>({})
+const submissionResult = ref<any>(null)
 const qa = ref({ question: '', answer: '', session_id: undefined as number | undefined })
 const recommend = ref({ knowledge_point: '', result: null as any })
 const feedback = ref({ rating: 5, content: '' })
@@ -64,18 +67,40 @@ async function loadQuestions(assignmentId: number) {
   const { data } = await api.get(`/assignments/${assignmentId}/questions`)
   questions.value = data
   current.value = 0
+  answers.value = {}
+  answerImages.value = {}
+  answerFileNames.value = {}
+  submissionResult.value = null
 }
 
 async function submitAssignment() {
   if (!selectedAssignmentId.value) return
-  await api.post('/assignments/submit', {
+  const { data } = await api.post('/assignments/submit', {
     assignment_id: selectedAssignmentId.value,
     answers: questions.value.map((question) => ({
       question_id: question.id,
-      content: answers.value[question.id] || ''
+      content: answers.value[question.id] || '',
+      image_path: answerImages.value[question.id] || undefined
     }))
   })
-  alert('提交成功')
+  submissionResult.value = data
+}
+
+async function uploadShortAnswerFile(questionId: number, event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  const form = new FormData()
+  form.append('file', file)
+  const { data } = await api.post('/assignments/answer-upload', form)
+  answerImages.value[questionId] = data.image_path
+  answerFileNames.value[questionId] = data.filename
+}
+
+async function openProtectedFile(url: string) {
+  const apiPath = url.startsWith('/api') ? url.slice(4) : url
+  const { data } = await api.get(apiPath, { responseType: 'blob' })
+  const objectUrl = URL.createObjectURL(data)
+  window.open(objectUrl, '_blank')
 }
 
 async function recommendQuestions() {
@@ -94,6 +119,21 @@ async function sendFeedback() {
 
 function answered(questionId: number) {
   return Boolean(answers.value[questionId])
+}
+
+function questionTypeName(type: string) {
+  const names: Record<string, string> = {
+    choice: '选择题',
+    blank: '填空题',
+    judge: '判断题',
+    short: '简答题'
+  }
+  return names[type] || type
+}
+
+function resultStatusText(result: any) {
+  if (result.is_correct === null || result.is_correct === undefined) return '待教师批改'
+  return result.is_correct ? '正确' : '错误'
 }
 
 onMounted(load)
@@ -173,17 +213,47 @@ onMounted(load)
           <button
             v-for="option in questions[current].options || []"
             :key="option.label"
-            class="secondary"
+            class="answer-option"
+            :class="{ selected: answers[questions[current].id] === option.label }"
             @click="answers[questions[current].id] = option.label"
           >
             {{ option.label }}. {{ option.text }}
           </button>
         </div>
         <div v-else-if="questions[current].type === 'judge'" class="row">
-          <button class="secondary" @click="answers[questions[current].id] = 'true'">正确</button>
-          <button class="secondary" @click="answers[questions[current].id] = 'false'">错误</button>
+          <button
+            class="answer-option"
+            :class="{ selected: answers[questions[current].id] === 'true' }"
+            @click="answers[questions[current].id] = 'true'"
+          >
+            正确
+          </button>
+          <button
+            class="answer-option"
+            :class="{ selected: answers[questions[current].id] === 'false' }"
+            @click="answers[questions[current].id] = 'false'"
+          >
+            错误
+          </button>
         </div>
-        <textarea v-else v-model="answers[questions[current].id]" placeholder="填空题输入答案；简答题可填写图片地址或说明" />
+        <input
+          v-else-if="questions[current].type === 'blank'"
+          v-model="answers[questions[current].id]"
+          class="answer-input"
+          :class="{ selected: answered(questions[current].id) }"
+          placeholder="请输入填空题答案"
+        />
+        <textarea
+          v-else
+          v-model="answers[questions[current].id]"
+          placeholder="简答题可填写说明，并上传图片或文件"
+        />
+        <div v-if="questions[current].type === 'short'" class="upload-box">
+          <input type="file" @change="uploadShortAnswerFile(questions[current].id, $event)" />
+          <span v-if="answerFileNames[questions[current].id]" class="badge success">
+            已上传：{{ answerFileNames[questions[current].id] }}
+          </span>
+        </div>
         <div class="row">
           <button class="secondary" :disabled="current === 0" @click="current--">上一题</button>
           <button class="secondary" :disabled="current === questions.length - 1" @click="current++">下一题</button>
@@ -203,7 +273,54 @@ onMounted(load)
         </div>
       </aside>
     </div>
-    <div v-else class="empty-state">请选择一份作业开始答题。</div>
+    <div v-if="submissionResult" class="result-panel">
+      <div class="section-title">
+        <h3>答题结果</h3>
+        <span>总分 {{ submissionResult.total_score }}</span>
+      </div>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>题型</th>
+            <th>题干</th>
+            <th>你的答案</th>
+            <th>参考答案</th>
+            <th>结果</th>
+            <th>得分</th>
+            <th>解析</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="item in submissionResult.answers" :key="item.question_id">
+            <td><span class="badge">{{ questionTypeName(item.type) }}</span></td>
+            <td>{{ item.stem }}</td>
+            <td>
+              <p>{{ item.student_answer || '未作答' }}</p>
+              <button
+                v-if="item.image_path"
+                class="secondary"
+                type="button"
+                @click="openProtectedFile(item.image_path)"
+              >
+                查看上传文件
+              </button>
+            </td>
+            <td>{{ item.reference_answer }}</td>
+            <td>
+              <span
+                class="badge"
+                :class="{ success: item.is_correct === true, danger: item.is_correct === false }"
+              >
+                {{ resultStatusText(item) }}
+              </span>
+            </td>
+            <td>{{ item.score }} / {{ item.max_score }}</td>
+            <td>{{ item.analysis || '无' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div v-if="!questions.length" class="empty-state">请选择一份作业开始答题。</div>
   </section>
 
   <section v-else-if="feature === 'recommendation'" class="workspace-card">
