@@ -13,7 +13,9 @@ export const roleFeatures: Record<Role, FeatureItem[]> = {
     { key: 'knowledge', label: '知识库上传', description: '上传教材、教案等资料并同步构建 RAG 索引', icon: 'FileUp' },
     { key: 'lesson', label: '智能教案', description: '基于课程主题、目标和课时生成结构化教案', icon: 'Wand2' },
     { key: 'question-bank', label: '题库管理', description: '录入选择、填空、判断和简答题', icon: 'ListChecks' },
+    { key: 'question-bank-view', label: '题库查看', description: '查看当前课程题库与题目明细', icon: 'Eye' },
     { key: 'assignments', label: '作业发布', description: '组合题目并发布给课程学生作答', icon: 'ClipboardList' },
+    { key: 'submission-records', label: '作答记录', description: '查看每个学生的作业作答记录并批改简答题', icon: 'ClipboardCheck' },
     { key: 'qa-history', label: '问答记录', description: '查看学生智能问答历史并导出 PDF', icon: 'MessagesSquare' },
     { key: 'feedback', label: '反馈评价', description: '向管理员提交系统使用反馈', icon: 'MessageSquare' }
   ],

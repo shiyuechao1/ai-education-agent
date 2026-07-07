@@ -22,9 +22,10 @@ const courseForm = ref({
     name: '',
     description: '',
     teacher_id: undefined,
-    student_ids: ''
+    student_ids: []
 });
 const teachers = computed(() => users.value.filter((item) => item.role === 'teacher'));
+const students = computed(() => users.value.filter((item) => item.role === 'student'));
 async function load() {
     const [userRes, courseRes, feedbackRes, statRes] = await Promise.all([
         api.get('/admin/users'),
@@ -51,11 +52,19 @@ async function createCourse() {
         name: courseForm.value.name,
         description: courseForm.value.description,
         teacher_id: Number(courseForm.value.teacher_id),
-        student_ids: courseForm.value.student_ids.split(',').map((id) => Number(id.trim())).filter(Boolean)
+        student_ids: courseForm.value.student_ids
     });
     courseForm.value.name = '';
-    courseForm.value.student_ids = '';
+    courseForm.value.student_ids = [];
     await load();
+}
+function toggleStudent(studentId) {
+    const selected = courseForm.value.student_ids;
+    if (selected.includes(studentId)) {
+        courseForm.value.student_ids = selected.filter((id) => id !== studentId);
+        return;
+    }
+    courseForm.value.student_ids = [...selected, studentId];
 }
 async function reply(item) {
     await api.put(`/admin/feedback/${item.id}/reply`, { reply: item.reply });
@@ -175,10 +184,29 @@ else if (__VLS_ctx.feature === 'create-course') {
         (user.name);
         (user.user_no);
     }
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-        placeholder: "学生 ID，用英文逗号分隔",
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "student-picker" },
     });
-    (__VLS_ctx.courseForm.student_ids);
+    for (const [student] of __VLS_getVForSourceType((__VLS_ctx.students))) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+            ...{ onClick: (...[$event]) => {
+                    if (!!(__VLS_ctx.feature === 'create-user'))
+                        return;
+                    if (!(__VLS_ctx.feature === 'create-course'))
+                        return;
+                    __VLS_ctx.toggleStudent(student.id);
+                } },
+            key: (student.id),
+            type: "button",
+            ...{ class: "student-option" },
+            ...{ class: ({ active: __VLS_ctx.courseForm.student_ids.includes(student.id) }) },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+        (student.name);
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+        (student.user_no);
+        (student.username);
+    }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
         ...{ onClick: (__VLS_ctx.createCourse) },
     });
@@ -350,6 +378,8 @@ else {
 /** @type {__VLS_StyleScopedClasses['section-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-stack']} */ ;
 /** @type {__VLS_StyleScopedClasses['compact']} */ ;
+/** @type {__VLS_StyleScopedClasses['student-picker']} */ ;
+/** @type {__VLS_StyleScopedClasses['student-option']} */ ;
 /** @type {__VLS_StyleScopedClasses['workspace-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['section-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['secondary']} */ ;
@@ -383,9 +413,11 @@ const __VLS_self = (await import('vue')).defineComponent({
             userForm: userForm,
             courseForm: courseForm,
             teachers: teachers,
+            students: students,
             load: load,
             createUser: createUser,
             createCourse: createCourse,
+            toggleStudent: toggleStudent,
             reply: reply,
         };
     },

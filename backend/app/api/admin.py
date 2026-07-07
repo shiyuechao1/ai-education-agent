@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
@@ -52,7 +52,20 @@ def create_course(
     teacher = db.get(User, payload.teacher_id)
     if not teacher or teacher.role != Role.teacher:
         raise HTTPException(status_code=400, detail="授课教师不存在")
-    students = db.scalars(select(User).where(User.id.in_(payload.student_ids))).all()
+    raw_student_ids = list(dict.fromkeys(payload.student_ids))
+    student_user_nos = [str(student_id) for student_id in raw_student_ids]
+    students = db.scalars(
+        select(User).where(
+            User.role == Role.student,
+            or_(User.id.in_(raw_student_ids), User.user_no.in_(student_user_nos)),
+        )
+    ).all()
+    matched_identifiers = {student.id for student in students} | {
+        int(student.user_no) for student in students if student.user_no.isdigit()
+    }
+    missing_identifiers = [student_id for student_id in raw_student_ids if student_id not in matched_identifiers]
+    if missing_identifiers:
+        raise HTTPException(status_code=400, detail=f"学生不存在或不是学生身份：{missing_identifiers}")
     if any(student.role != Role.student for student in students):
         raise HTTPException(status_code=400, detail="课程成员只能选择学生")
     course = Course(name=payload.name, description=payload.description, teacher_id=payload.teacher_id)

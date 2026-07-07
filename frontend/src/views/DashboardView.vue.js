@@ -1,5 +1,5 @@
 /// <reference types="../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
-import { BarChart3, BookOpen, Bot, ClipboardList, FileUp, FolderOpen, GraduationCap, Library, ListChecks, LogOut, MessageSquare, MessageSquareReply, MessagesSquare, PenTool, PlusSquare, Shield, Sparkles, UserPlus, Users, Wand2 } from 'lucide-vue-next';
+import { BarChart3, BookOpen, Bot, ClipboardCheck, ClipboardList, Eye, FileUp, FolderOpen, GraduationCap, Library, ListChecks, LogOut, MessageSquare, MessageSquareReply, MessagesSquare, PenTool, PlusSquare, Shield, Sparkles, UserPlus, Users, Wand2 } from 'lucide-vue-next';
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { roleFeatures } from '../router/features';
@@ -11,7 +11,9 @@ const iconMap = {
     BarChart3,
     BookOpen,
     Bot,
+    ClipboardCheck,
     ClipboardList,
+    Eye,
     FileUp,
     FolderOpen,
     GraduationCap,

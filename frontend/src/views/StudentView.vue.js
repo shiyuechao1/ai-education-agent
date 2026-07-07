@@ -13,6 +13,9 @@ const selectedAssignmentId = ref();
 const questions = ref([]);
 const current = ref(0);
 const answers = ref({});
+const answerImages = ref({});
+const answerFileNames = ref({});
+const submissionResult = ref(null);
 const qa = ref({ question: '', answer: '', session_id: undefined });
 const recommend = ref({ knowledge_point: '', result: null });
 const feedback = ref({ rating: 5, content: '' });
@@ -59,18 +62,39 @@ async function loadQuestions(assignmentId) {
     const { data } = await api.get(`/assignments/${assignmentId}/questions`);
     questions.value = data;
     current.value = 0;
+    answers.value = {};
+    answerImages.value = {};
+    answerFileNames.value = {};
+    submissionResult.value = null;
 }
 async function submitAssignment() {
     if (!selectedAssignmentId.value)
         return;
-    await api.post('/assignments/submit', {
+    const { data } = await api.post('/assignments/submit', {
         assignment_id: selectedAssignmentId.value,
         answers: questions.value.map((question) => ({
             question_id: question.id,
-            content: answers.value[question.id] || ''
+            content: answers.value[question.id] || '',
+            image_path: answerImages.value[question.id] || undefined
         }))
     });
-    alert('提交成功');
+    submissionResult.value = data;
+}
+async function uploadShortAnswerFile(questionId, event) {
+    const file = event.target.files?.[0];
+    if (!file)
+        return;
+    const form = new FormData();
+    form.append('file', file);
+    const { data } = await api.post('/assignments/answer-upload', form);
+    answerImages.value[questionId] = data.image_path;
+    answerFileNames.value[questionId] = data.filename;
+}
+async function openProtectedFile(url) {
+    const apiPath = url.startsWith('/api') ? url.slice(4) : url;
+    const { data } = await api.get(apiPath, { responseType: 'blob' });
+    const objectUrl = URL.createObjectURL(data);
+    window.open(objectUrl, '_blank');
 }
 async function recommendQuestions() {
     if (!courseId.value)
@@ -87,6 +111,20 @@ async function sendFeedback() {
 }
 function answered(questionId) {
     return Boolean(answers.value[questionId]);
+}
+function questionTypeName(type) {
+    const names = {
+        choice: '选择题',
+        blank: '填空题',
+        judge: '判断题',
+        short: '简答题'
+    };
+    return names[type] || type;
+}
+function resultStatusText(result) {
+    if (result.is_correct === null || result.is_correct === undefined)
+        return '待教师批改';
+    return result.is_correct ? '正确' : '错误';
 }
 onMounted(load);
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
@@ -311,7 +349,8 @@ else if (__VLS_ctx.feature === 'assignment') {
                             __VLS_ctx.answers[__VLS_ctx.questions[__VLS_ctx.current].id] = option.label;
                         } },
                     key: (option.label),
-                    ...{ class: "secondary" },
+                    ...{ class: "answer-option" },
+                    ...{ class: ({ selected: __VLS_ctx.answers[__VLS_ctx.questions[__VLS_ctx.current].id] === option.label }) },
                 });
                 (option.label);
                 (option.text);
@@ -339,7 +378,8 @@ else if (__VLS_ctx.feature === 'assignment') {
                             return;
                         __VLS_ctx.answers[__VLS_ctx.questions[__VLS_ctx.current].id] = 'true';
                     } },
-                ...{ class: "secondary" },
+                ...{ class: "answer-option" },
+                ...{ class: ({ selected: __VLS_ctx.answers[__VLS_ctx.questions[__VLS_ctx.current].id] === 'true' }) },
             });
             __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
                 ...{ onClick: (...[$event]) => {
@@ -359,14 +399,52 @@ else if (__VLS_ctx.feature === 'assignment') {
                             return;
                         __VLS_ctx.answers[__VLS_ctx.questions[__VLS_ctx.current].id] = 'false';
                     } },
-                ...{ class: "secondary" },
+                ...{ class: "answer-option" },
+                ...{ class: ({ selected: __VLS_ctx.answers[__VLS_ctx.questions[__VLS_ctx.current].id] === 'false' }) },
             });
+        }
+        else if (__VLS_ctx.questions[__VLS_ctx.current].type === 'blank') {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+                ...{ class: "answer-input" },
+                ...{ class: ({ selected: __VLS_ctx.answered(__VLS_ctx.questions[__VLS_ctx.current].id) }) },
+                placeholder: "请输入填空题答案",
+            });
+            (__VLS_ctx.answers[__VLS_ctx.questions[__VLS_ctx.current].id]);
         }
         else {
             __VLS_asFunctionalElement(__VLS_intrinsicElements.textarea)({
                 value: (__VLS_ctx.answers[__VLS_ctx.questions[__VLS_ctx.current].id]),
-                placeholder: "填空题输入答案；简答题可填写图片地址或说明",
+                placeholder: "简答题可填写说明，并上传图片或文件",
             });
+        }
+        if (__VLS_ctx.questions[__VLS_ctx.current].type === 'short') {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+                ...{ class: "upload-box" },
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+                ...{ onChange: (...[$event]) => {
+                        if (!!(__VLS_ctx.feature === 'courses'))
+                            return;
+                        if (!!(__VLS_ctx.feature === 'knowledge'))
+                            return;
+                        if (!!(__VLS_ctx.feature === 'qa'))
+                            return;
+                        if (!(__VLS_ctx.feature === 'assignment'))
+                            return;
+                        if (!(__VLS_ctx.questions.length))
+                            return;
+                        if (!(__VLS_ctx.questions[__VLS_ctx.current].type === 'short'))
+                            return;
+                        __VLS_ctx.uploadShortAnswerFile(__VLS_ctx.questions[__VLS_ctx.current].id, $event);
+                    } },
+                type: "file",
+            });
+            if (__VLS_ctx.answerFileNames[__VLS_ctx.questions[__VLS_ctx.current].id]) {
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                    ...{ class: "badge success" },
+                });
+                (__VLS_ctx.answerFileNames[__VLS_ctx.questions[__VLS_ctx.current].id]);
+            }
         }
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "row" },
@@ -433,7 +511,80 @@ else if (__VLS_ctx.feature === 'assignment') {
             (index + 1);
         }
     }
-    else {
+    if (__VLS_ctx.submissionResult) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "result-panel" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "section-title" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.h3, __VLS_intrinsicElements.h3)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+        (__VLS_ctx.submissionResult.total_score);
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.table, __VLS_intrinsicElements.table)({
+            ...{ class: "table" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.thead, __VLS_intrinsicElements.thead)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.tr, __VLS_intrinsicElements.tr)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.tbody, __VLS_intrinsicElements.tbody)({});
+        for (const [item] of __VLS_getVForSourceType((__VLS_ctx.submissionResult.answers))) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.tr, __VLS_intrinsicElements.tr)({
+                key: (item.question_id),
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                ...{ class: "badge" },
+            });
+            (__VLS_ctx.questionTypeName(item.type));
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+            (item.stem);
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({});
+            (item.student_answer || '未作答');
+            if (item.image_path) {
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+                    ...{ onClick: (...[$event]) => {
+                            if (!!(__VLS_ctx.feature === 'courses'))
+                                return;
+                            if (!!(__VLS_ctx.feature === 'knowledge'))
+                                return;
+                            if (!!(__VLS_ctx.feature === 'qa'))
+                                return;
+                            if (!(__VLS_ctx.feature === 'assignment'))
+                                return;
+                            if (!(__VLS_ctx.submissionResult))
+                                return;
+                            if (!(item.image_path))
+                                return;
+                            __VLS_ctx.openProtectedFile(item.image_path);
+                        } },
+                    ...{ class: "secondary" },
+                    type: "button",
+                });
+            }
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+            (item.reference_answer);
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                ...{ class: "badge" },
+                ...{ class: ({ success: item.is_correct === true, danger: item.is_correct === false }) },
+            });
+            (__VLS_ctx.resultStatusText(item));
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+            (item.score);
+            (item.max_score);
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
+            (item.analysis || '无');
+        }
+    }
+    if (!__VLS_ctx.questions.length) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "empty-state" },
         });
@@ -531,15 +682,25 @@ else {
 /** @type {__VLS_StyleScopedClasses['answer-layout']} */ ;
 /** @type {__VLS_StyleScopedClasses['question-panel']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-stack']} */ ;
-/** @type {__VLS_StyleScopedClasses['secondary']} */ ;
+/** @type {__VLS_StyleScopedClasses['answer-option']} */ ;
 /** @type {__VLS_StyleScopedClasses['row']} */ ;
-/** @type {__VLS_StyleScopedClasses['secondary']} */ ;
-/** @type {__VLS_StyleScopedClasses['secondary']} */ ;
+/** @type {__VLS_StyleScopedClasses['answer-option']} */ ;
+/** @type {__VLS_StyleScopedClasses['answer-option']} */ ;
+/** @type {__VLS_StyleScopedClasses['answer-input']} */ ;
+/** @type {__VLS_StyleScopedClasses['upload-box']} */ ;
+/** @type {__VLS_StyleScopedClasses['badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['success']} */ ;
 /** @type {__VLS_StyleScopedClasses['row']} */ ;
 /** @type {__VLS_StyleScopedClasses['secondary']} */ ;
 /** @type {__VLS_StyleScopedClasses['secondary']} */ ;
 /** @type {__VLS_StyleScopedClasses['question-map']} */ ;
 /** @type {__VLS_StyleScopedClasses['question-index']} */ ;
+/** @type {__VLS_StyleScopedClasses['result-panel']} */ ;
+/** @type {__VLS_StyleScopedClasses['section-title']} */ ;
+/** @type {__VLS_StyleScopedClasses['table']} */ ;
+/** @type {__VLS_StyleScopedClasses['badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['secondary']} */ ;
+/** @type {__VLS_StyleScopedClasses['badge']} */ ;
 /** @type {__VLS_StyleScopedClasses['empty-state']} */ ;
 /** @type {__VLS_StyleScopedClasses['workspace-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['section-title']} */ ;
@@ -569,6 +730,8 @@ const __VLS_self = (await import('vue')).defineComponent({
             questions: questions,
             current: current,
             answers: answers,
+            answerFileNames: answerFileNames,
+            submissionResult: submissionResult,
             qa: qa,
             recommend: recommend,
             feedback: feedback,
@@ -579,9 +742,13 @@ const __VLS_self = (await import('vue')).defineComponent({
             ask: ask,
             loadQuestions: loadQuestions,
             submitAssignment: submitAssignment,
+            uploadShortAnswerFile: uploadShortAnswerFile,
+            openProtectedFile: openProtectedFile,
             recommendQuestions: recommendQuestions,
             sendFeedback: sendFeedback,
             answered: answered,
+            questionTypeName: questionTypeName,
+            resultStatusText: resultStatusText,
         };
     },
 });
