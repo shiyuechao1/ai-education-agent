@@ -201,3 +201,32 @@ class AgentTask(Base):
     retry_count: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+# ---- 错题收藏 ----
+class ErrorCollection(Base):
+    __tablename__ = "error_collections"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    question_id: Mapped[int] = mapped_column(ForeignKey("questions.id"), index=True)
+    wrong_answer: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    student: Mapped[User] = relationship("User")
+    question: Mapped[Question] = relationship("Question")
+
+
+# ---- 学习记录 ----
+class LearningRecord(Base):
+    __tablename__ = "learning_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id"), index=True)
+    activity_type: Mapped[str] = mapped_column(String(32))   # qa / answer / recommend / view_knowledge
+    detail: Mapped[dict | None] = mapped_column(JSON)         # {question, answer, score, ...}
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    student: Mapped[User] = relationship("User")
+    course: Mapped[Course] = relationship("Course")

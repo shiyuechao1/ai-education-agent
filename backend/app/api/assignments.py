@@ -33,7 +33,9 @@ from app.schemas.common import (
     SubmissionOut,
     SubmissionResult,
 )
+from app.models.entities import ErrorCollection
 from app.services.grading import auto_grade
+from app.services.llm import record_learning
 
 
 router = APIRouter(prefix="/assignments", tags=["assignments"])
@@ -301,6 +303,27 @@ def submit_assignment(
             }
         )
     submission.total_score = total
+    # 自动收藏错题 + 记录学习行为
+    for item in result_answers:
+        if item["is_correct"] is False or (item["is_correct"] is None and item["score"] == 0):
+            exists = db.scalar(
+                select(ErrorCollection).where(
+                    ErrorCollection.student_id == current_user.id,
+                    ErrorCollection.question_id == item["question_id"],
+                )
+            )
+            if not exists:
+                db.add(ErrorCollection(
+                    student_id=current_user.id,
+                    question_id=item["question_id"],
+                    wrong_answer=item["student_answer"],
+                ))
+    record_learning(db, current_user.id, assignment.course_id, "answer", {
+        "assignment_id": assignment.id,
+        "total_score": total,
+        "correct_count": sum(1 for a in result_answers if a["is_correct"] is True),
+        "total_count": len(result_answers),
+    })
     db.commit()
     db.refresh(submission)
     return {

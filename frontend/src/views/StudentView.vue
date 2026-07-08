@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CheckCircle2, Download, FileUp, MessageSquare, Send, Sparkles } from 'lucide-vue-next'
+import { Bot, CheckCircle2, Download, FileUp, GraduationCap, MessageSquare, Send, Sparkles, Trash2 } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { api, type Course } from '../api/client'
@@ -22,6 +22,13 @@ const qa = ref({ question: '', answer: '', session_id: undefined as number | und
 const recommend = ref({ knowledge_point: '', result: null as any })
 const feedback = ref({ rating: 5, content: '' })
 const uploadFile = ref<File | null>(null)
+const errors = ref<any[]>([])
+const tutoring = ref<any>(null)
+const records = ref<any[]>([])
+const learningPathForm = ref({ student_profile: '', weak_points: '' })
+const learningPathResult = ref<any>(null)
+const reportForm = ref({ topic: '', data: '' })
+const reportResult = ref<any>(null)
 
 const selectedCourse = computed(() => courses.value.find((item) => item.id === courseId.value))
 
@@ -134,6 +141,63 @@ function questionTypeName(type: string) {
 function resultStatusText(result: any) {
   if (result.is_correct === null || result.is_correct === undefined) return '待教师批改'
   return result.is_correct ? '正确' : '错误'
+}
+
+async function loadErrors() {
+  const { data } = await api.get('/errors/my')
+  errors.value = data
+}
+
+async function removeError(id: number) {
+  await api.delete(`/errors/${id}`)
+  await loadErrors()
+}
+
+async function analyzeErrors() {
+  if (!courseId.value) return
+  const { data } = await api.post('/ai/error-analysis', {
+    course_id: courseId.value,
+    error_ids: [],
+    include_weak_points: true
+  })
+  tutoring.value = data
+}
+
+async function loadRecords() {
+  const { data } = await api.get('/learning/my')
+  records.value = data
+}
+
+function recordLabel(type: string) {
+  const labels: Record<string, string> = { qa: '智能问答', answer: '在线答题', recommend: '练习推荐' }
+  return labels[type] || type
+}
+
+function questionTypeLabel(type: string) {
+  const labels: Record<string, string> = { choice: '选择题', blank: '填空题', judge: '判断题', short: '简答题' }
+  return labels[type] || type
+}
+
+async function generateLearningPath() {
+  const { data } = await api.post('/ai/agent/run', {
+    tool_name: 'learning_path',
+    payload: {
+      student_profile: learningPathForm.value.student_profile,
+      weak_points: learningPathForm.value.weak_points.split(/[,，、\s]+/).filter(Boolean)
+    }
+  })
+  learningPathResult.value = data.output || data
+}
+
+async function generateReport() {
+  const { data } = await api.post('/ai/agent/run', {
+    tool_name: 'report_generation',
+    payload: {
+      topic: reportForm.value.topic,
+      data: reportForm.value.data ? JSON.parse(reportForm.value.data) : {}
+    }
+  })
+  reportResult.value = data.output || data
 }
 
 onMounted(load)
@@ -335,6 +399,157 @@ onMounted(load)
       </div>
       <pre>{{ recommend.result || '推荐结果将在这里展示' }}</pre>
     </div>
+  </section>
+
+  <section v-else-if="feature === 'errors'" class="workspace-card">
+    <div class="section-title">
+      <h2>错题本</h2>
+      <span>{{ errors.length }} 道错题</span>
+    </div>
+    <div class="toolbar">
+      <button @click="loadErrors">刷新</button>
+      <button v-if="errors.length" @click="analyzeErrors"><Bot :size="18" />智能分析</button>
+    </div>
+
+    <!-- 错题列表 -->
+    <div v-if="errors.length" class="answer-records">
+      <article v-for="err in errors" :key="err.id" class="answer-record">
+        <div class="answer-record-head">
+          <span class="badge">{{ questionTypeLabel(err.type) }}</span>
+          <span class="badge" :class="{ danger: true }">✗ 错误</span>
+          <button class="secondary mini-button" @click="removeError(err.id)"><Trash2 :size="14" /></button>
+        </div>
+        <p class="question-stem">{{ err.stem }}</p>
+        <div class="answer-meta">
+          <div><span>我的答案</span><p>{{ err.wrong_answer || '未作答' }}</p></div>
+          <div><span>正确答案</span><p>{{ err.answer }}</p></div>
+          <div><span>解析</span><p>{{ err.analysis || '无' }}</p></div>
+        </div>
+      </article>
+    </div>
+    <div v-else class="empty-state">暂无错题，完成练习后自动收集。</div>
+
+    <!-- 个性化辅导方案 -->
+    <div v-if="tutoring" class="tutoring-panel">
+      <div class="section-title"><h2>🤖 个性化辅导方案</h2></div>
+      <div class="lesson-section" v-if="tutoring.summary">
+        <h4>📊 总体评价</h4><p>{{ tutoring.summary }}</p>
+      </div>
+      <div class="lesson-section" v-if="tutoring.weak_points?.length">
+        <h4>⚠️ 薄弱知识点</h4>
+        <ul><li v-for="w in tutoring.weak_points" :key="w">{{ w }}</li></ul>
+      </div>
+      <div class="lesson-section" v-if="tutoring.error_analysis?.length">
+        <h4>🔍 每题解析</h4>
+        <div v-for="(ea, i) in tutoring.error_analysis" :key="i" class="step-card">
+          <p><strong>{{ ea.stem }}</strong></p>
+          <p>错因：{{ ea.error_reason }}</p>
+          <p>解析：{{ ea.explanation }}</p>
+        </div>
+      </div>
+      <div class="lesson-section" v-if="tutoring.suggestions?.length">
+        <h4>💡 学习建议</h4>
+        <ul><li v-for="s in tutoring.suggestions" :key="s">{{ s }}</li></ul>
+      </div>
+      <div class="lesson-section" v-if="tutoring.recommended_questions?.length">
+        <h4>📝 推荐巩固练习</h4>
+        <div v-for="(q, i) in tutoring.recommended_questions" :key="i" class="step-card">
+          <span class="badge">{{ questionTypeLabel(q.type) }}</span>
+          <p><strong>{{ q.stem }}</strong></p>
+          <p v-if="q.options?.length">选项：{{ q.options.map((o: any) => o.label + '. ' + o.text).join('；') }}</p>
+          <details><summary>查看答案</summary><p>答案：{{ q.answer }} | {{ q.analysis }}</p></details>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section v-else-if="feature === 'learning-path'" class="workspace-card">
+    <div class="section-title">
+      <h2>个性化学习路径</h2>
+      <span>AI 分析薄弱点生成学习计划</span>
+    </div>
+    <div class="form-grid two">
+      <div class="form-stack">
+        <textarea v-model="learningPathForm.student_profile" placeholder="你的学习情况（如：八年级，数学基础中等）" />
+        <input v-model="learningPathForm.weak_points" placeholder="薄弱知识点（用逗号分隔，如：勾股定理,全等三角形）" />
+        <button @click="generateLearningPath"><Bot :size="18" />生成学习路径</button>
+      </div>
+      <div class="lesson-preview" v-if="learningPathResult">
+        <div class="lesson-section" v-if="learningPathResult.summary">
+          <h4>📊 路径概览</h4><p>{{ learningPathResult.summary }}</p>
+        </div>
+        <div class="lesson-section" v-if="learningPathResult.stages?.length">
+          <h4>🗺️ 学习阶段</h4>
+          <div v-for="(s, i) in learningPathResult.stages" :key="i" class="step-card">
+            <span class="badge">阶段 {{ i + 1 }}</span>
+            <p>{{ s }}</p>
+          </div>
+        </div>
+        <div class="lesson-section" v-if="learningPathResult.resources?.length">
+          <h4>📚 推荐资源</h4>
+          <ul><li v-for="(r, i) in learningPathResult.resources" :key="i">{{ r }}</li></ul>
+        </div>
+        <div class="lesson-section" v-if="learningPathResult.practice_plan?.length">
+          <h4>📝 练习计划</h4>
+          <div v-for="(p, i) in learningPathResult.practice_plan" :key="i" class="step-card">
+            <span class="badge">{{ p }}</span>
+          </div>
+        </div>
+      </div>
+      <div v-else class="empty-state">填写学习情况后生成个性化路径</div>
+    </div>
+  </section>
+
+  <section v-else-if="feature === 'agent-report'" class="workspace-card">
+    <div class="section-title">
+      <h2>学习报告</h2>
+      <span>AI 生成综合学习分析</span>
+    </div>
+    <div class="form-grid two">
+      <div class="form-stack">
+        <input v-model="reportForm.topic" placeholder="报告主题（如：期中学习总结）" />
+        <textarea v-model="reportForm.data" placeholder='数据（JSON格式，如：{{"score":85,"days":30}}）' />
+        <button @click="generateReport"><Bot :size="18" />生成报告</button>
+      </div>
+      <div class="lesson-preview" v-if="reportResult">
+        <h3>{{ reportResult.title || '学习报告' }}</h3>
+        <div class="lesson-section" v-if="reportResult.highlights?.length">
+          <h4>🌟 亮点</h4>
+          <ul><li v-for="(h, i) in reportResult.highlights" :key="i">{{ h }}</li></ul>
+        </div>
+        <div class="lesson-section" v-if="reportResult.risks?.length">
+          <h4>⚠️ 需关注</h4>
+          <ul><li v-for="(r, i) in reportResult.risks" :key="i">{{ r }}</li></ul>
+        </div>
+        <div class="lesson-section" v-if="reportResult.suggestions?.length">
+          <h4>💡 建议</h4>
+          <ul><li v-for="(s, i) in reportResult.suggestions" :key="i">{{ s }}</li></ul>
+        </div>
+      </div>
+      <div v-else class="empty-state">填写报告主题生成学习报告</div>
+    </div>
+  </section>
+
+  <section v-else-if="feature === 'records'" class="workspace-card">
+    <div class="section-title">
+      <h2>学习记录</h2>
+      <span>{{ records.length }} 条记录</span>
+    </div>
+    <button class="secondary" @click="loadRecords">刷新</button>
+
+    <table v-if="records.length" class="table" style="margin-top:12px">
+      <thead>
+        <tr><th>类型</th><th>详情</th><th>时间</th></tr>
+      </thead>
+      <tbody>
+        <tr v-for="r in records" :key="r.id">
+          <td><span class="badge">{{ recordLabel(r.activity_type) }}</span></td>
+          <td>{{ r.detail?.question || r.detail?.assignment_id ? '查看详情' : '-' }}</td>
+          <td>{{ r.created_at }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div v-else class="empty-state">暂无学习记录，完成课程活动后自动生成。</div>
   </section>
 
   <section v-else class="workspace-card">

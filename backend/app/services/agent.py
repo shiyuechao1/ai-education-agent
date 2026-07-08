@@ -4,8 +4,10 @@ from typing import Any
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
-from app.models.entities import AgentTask
-from app.services.llm import invoke_json
+from sqlalchemy import select
+
+from app.models.entities import AgentTask, ErrorCollection, Question
+from app.services.llm import ERROR_ANALYSIS_PROMPT, invoke_json
 from app.services.rag import rag_service
 
 
@@ -57,6 +59,12 @@ class McpAgentService:
             "语音问答文本转写后的流式问答入口",
             {"course_id": "int", "transcript": "str"},
             self._streaming_voice_qa,
+        )
+        self.register(
+            "error_analysis",
+            "错题分析与个性化辅导方案：诊断薄弱点，生成学习建议和练习计划",
+            {"student_id": "int", "error_ids": "list[int]", "weak_points": "bool"},
+            self._error_analysis,
         )
 
     def register(self, name: str, description: str, input_schema: dict[str, Any], func: ToolFunc) -> None:
@@ -122,6 +130,31 @@ class McpAgentService:
         transcript = str(payload.get("transcript", ""))
         result = rag_service.answer(course_id=course_id, question=transcript)
         return {"mode": "voice_transcript", **result}
+
+    def _error_analysis(self, payload: dict[str, Any], db: Session) -> dict[str, Any]:
+        student_id = int(payload.get("student_id", 0))
+        error_ids = payload.get("error_ids", []) or []
+
+        query = select(ErrorCollection).where(ErrorCollection.student_id == student_id)
+        if error_ids:
+            query = query.where(ErrorCollection.id.in_(error_ids))
+        errors = db.scalars(query).all()
+
+        if not errors:
+            return {"summary": "暂无错题记录。", "weak_points": [], "error_analysis": [], "suggestions": [], "practice_plan": []}
+
+        questions_map = {q.id: q for q in db.scalars(select(Question).where(Question.id.in_([e.question_id for e in errors])))}
+
+        lines = []
+        for err in errors:
+            q = questions_map.get(err.question_id)
+            if q:
+                lines.append(f"- 题目：{q.stem}\n  正确答案：{q.answer}\n  学生答案：{err.wrong_answer}")
+
+        prompt = ERROR_ANALYSIS_PROMPT.format(error_questions="\n".join(lines))
+        result = invoke_json(prompt, {"summary": "", "weak_points": [], "error_analysis": [], "suggestions": [], "practice_plan": []})
+        result["error_count"] = len(errors)
+        return result
 
 
 agent_service = McpAgentService()

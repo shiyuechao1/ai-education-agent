@@ -7,6 +7,7 @@ from app.api.deps import ensure_course_access, get_current_user
 from app.core.database import get_db
 from app.models.entities import ChatMessage, ChatSession, Role, User
 from app.schemas.common import ChatAnswer, ChatAsk
+from app.services.llm import record_learning
 from app.services.pdf_export import export_chat_session_pdf
 from app.services.rag import rag_service
 
@@ -33,6 +34,9 @@ def ask(payload: ChatAsk, current_user: User = Depends(get_current_user), db: Se
         )
     )
     db.commit()
+    if current_user.role == Role.student:
+        record_learning(db, current_user.id, payload.course_id, "qa", {"question": payload.question[:200]})
+        db.commit()
     return ChatAnswer(session_id=session.id, answer=result["answer"], citations=result["citations"])
 
 

@@ -20,7 +20,7 @@ const selectedBankId = ref<number>()
 const selectedQuestionBankId = ref<number>()
 const bankQuestions = ref<any[]>([])
 const feedback = ref({ rating: 5, content: '' })
-const lesson = ref({ topic: '', objectives: '', duration_minutes: 45 })
+const lesson = ref({ topic: '', grade: '', subject: '', chapter: '', objectives: '', duration_minutes: 45 })
 const lessonResult = ref<any>(null)
 const bank = ref({
   name: '默认题库',
@@ -331,16 +331,91 @@ onMounted(load)
   <section v-else-if="feature === 'lesson'" class="workspace-card">
     <div class="section-title">
       <h2>智能教案编写</h2>
-      <span>结构化输出</span>
+      <span>完整结构化输出</span>
     </div>
     <div class="form-grid two">
       <div class="form-stack">
-        <input v-model="lesson.topic" placeholder="课程主题" />
-        <textarea v-model="lesson.objectives" placeholder="教学目标" />
-        <input v-model.number="lesson.duration_minutes" type="number" />
+        <div class="row">
+          <select v-model="lesson.grade">
+            <option value="">选择年级</option>
+            <option>一年级</option><option>二年级</option><option>三年级</option>
+            <option>四年级</option><option>五年级</option><option>六年级</option>
+            <option>七年级</option><option>八年级</option><option>九年级</option>
+            <option>高一</option><option>高二</option><option>高三</option>
+          </select>
+          <input v-model="lesson.subject" placeholder="学科（如：数学）" />
+        </div>
+        <input v-model="lesson.chapter" placeholder="章节（如：第十七章 勾股定理）" />
+        <input v-model="lesson.topic" placeholder="课程主题（如：勾股定理的证明）" />
+        <textarea v-model="lesson.objectives" placeholder="教学目标（如：掌握勾股定理的三种证明方法）" />
+        <input v-model.number="lesson.duration_minutes" type="number" placeholder="课时（分钟）" />
         <button @click="generateLesson"><Wand2 :size="18" />生成教案</button>
       </div>
-      <pre>{{ lessonResult || '生成结果将在这里展示' }}</pre>
+
+      <!-- 结构化展示 -->
+      <div class="lesson-preview" v-if="lessonResult">
+        <h3>{{ lessonResult.title }}</h3>
+        <div class="lesson-section" v-if="lessonResult.objectives?.length">
+          <h4>🎯 教学目标</h4>
+          <ul><li v-for="item in lessonResult.objectives" :key="item">{{ item }}</li></ul>
+        </div>
+        <div class="lesson-section" v-if="lessonResult.key_points?.length">
+          <h4>⭐ 教学重点</h4>
+          <ul><li v-for="item in lessonResult.key_points" :key="item">{{ item }}</li></ul>
+        </div>
+        <div class="lesson-section" v-if="lessonResult.difficult_points?.length">
+          <h4>⚠️ 教学难点</h4>
+          <ul><li v-for="item in lessonResult.difficult_points" :key="item">{{ item }}</li></ul>
+        </div>
+        <div class="lesson-section" v-if="lessonResult.introduction">
+          <h4>📖 课堂导入</h4>
+          <p>{{ lessonResult.introduction }}</p>
+        </div>
+        <div class="lesson-section" v-if="lessonResult.outline?.length">
+          <h4>📋 讲授提纲</h4>
+          <ol><li v-for="(item, i) in lessonResult.outline" :key="i">{{ item }}</li></ol>
+        </div>
+        <div class="lesson-section" v-if="lessonResult.steps?.length">
+          <h4>⏱️ 教学流程</h4>
+          <div v-for="(step, i) in lessonResult.steps" :key="i" class="step-card">
+            <span class="badge">{{ step.phase }} · {{ step.duration }}分钟</span>
+            <p>{{ step.content }}</p>
+            <div class="step-meta">
+              <small>👨‍🏫 {{ step.teacher_activity }}</small>
+              <small>👦 {{ step.student_activity }}</small>
+            </div>
+          </div>
+        </div>
+        <div class="lesson-section" v-if="lessonResult.interactive_questions?.length">
+          <h4>💬 互动问题</h4>
+          <ul><li v-for="(q, i) in lessonResult.interactive_questions" :key="i">{{ q }}</li></ul>
+        </div>
+        <div class="lesson-section" v-if="lessonResult.board_points?.length">
+          <h4>🖊️ 板书要点</h4>
+          <ul><li v-for="(item, i) in lessonResult.board_points" :key="i">{{ item }}</li></ul>
+        </div>
+        <div class="lesson-section" v-if="lessonResult.tiered_exercises">
+          <h4>📝 分层练习</h4>
+          <details><summary>基础巩固</summary>
+            <ul><li v-for="(ex, i) in lessonResult.tiered_exercises.basic" :key="'b'+i">{{ ex }}</li></ul>
+          </details>
+          <details><summary>能力提升</summary>
+            <ul><li v-for="(ex, i) in lessonResult.tiered_exercises.intermediate" :key="'i'+i">{{ ex }}</li></ul>
+          </details>
+          <details><summary>拓展延伸</summary>
+            <ul><li v-for="(ex, i) in lessonResult.tiered_exercises.advanced" :key="'a'+i">{{ ex }}</li></ul>
+          </details>
+        </div>
+        <div class="lesson-section" v-if="lessonResult.homework">
+          <h4>📚 课后作业</h4>
+          <p>{{ lessonResult.homework }}</p>
+        </div>
+        <div class="lesson-section" v-if="lessonResult.assessment">
+          <h4>✅ 评价方式</h4>
+          <p>{{ lessonResult.assessment }}</p>
+        </div>
+      </div>
+      <div v-else class="empty-state">填写课程信息后点击"生成教案"</div>
     </div>
   </section>
 

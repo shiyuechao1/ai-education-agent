@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api import admin, ai, analytics, assignments, auth, courses, feedback, knowledge, mcp, qa
+from app.api import admin, ai, analytics, assignments, auth, courses, errors, feedback, knowledge, learning, mcp, qa
 from app.core.database import Base, SessionLocal, engine
 from app.core.security import get_password_hash
 from app.models import *  # noqa: F403
@@ -30,6 +30,8 @@ app.include_router(ai.router, prefix="/api")
 app.include_router(mcp.router, prefix="/api")
 app.include_router(feedback.router, prefix="/api")
 app.include_router(analytics.router, prefix="/api")
+app.include_router(errors.router, prefix="/api")
+app.include_router(learning.router, prefix="/api")
 
 
 def seed_admin(db: Session) -> None:

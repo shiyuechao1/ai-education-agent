@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { MessageSquareReply, Plus, RefreshCcw, UserPlus } from 'lucide-vue-next'
+import { Bot, MessageSquareReply, Plus, RefreshCcw, UserPlus } from 'lucide-vue-next'
 import * as echarts from 'echarts'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -26,6 +26,8 @@ const courseForm = ref({
   teacher_id: undefined as number | undefined,
   student_ids: [] as number[]
 })
+const sqlQuery = ref('')
+const sqlResult = ref<any>(null)
 
 const teachers = computed(() => users.value.filter((item) => item.role === 'teacher'))
 const students = computed(() => users.value.filter((item) => item.role === 'student'))
@@ -96,6 +98,15 @@ async function renderChartIfNeeded() {
 }
 
 watch(feature, renderChartIfNeeded)
+async function runSqlQuery() {
+  if (!sqlQuery.value.trim()) return
+  const { data } = await api.post('/ai/agent/run', {
+    tool_name: 'teaching_data_sql',
+    payload: { sql: sqlQuery.value }
+  })
+  sqlResult.value = data.output || data
+}
+
 onMounted(load)
 </script>
 
@@ -202,6 +213,34 @@ onMounted(load)
         </tr>
       </tbody>
     </table>
+  </section>
+
+  <section v-else-if="feature === 'sql-agent'" class="workspace-card">
+    <div class="section-title">
+      <h2>数据查询 Agent</h2>
+      <span>输入 SQL 查询教学数据（仅支持 SELECT）</span>
+    </div>
+    <div class="form-stack compact">
+      <input v-model="sqlQuery" placeholder="SELECT * FROM users WHERE role='student'" />
+      <button @click="runSqlQuery"><Bot :size="18" />执行查询</button>
+    </div>
+    <div v-if="sqlResult" style="margin-top:16px">
+      <div v-if="sqlResult.error" class="badge danger">{{ sqlResult.error }}</div>
+      <div v-else-if="sqlResult.rows?.length">
+        <p class="muted">{{ sqlResult.rows.length }} 条结果</p>
+        <table class="table">
+          <thead>
+            <tr><th v-for="col in Object.keys(sqlResult.rows[0])" :key="col">{{ col }}</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="(row, i) in sqlResult.rows" :key="i">
+              <td v-for="col in Object.keys(row)" :key="col">{{ row[col] }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div v-else class="empty-state">查询无结果</div>
+    </div>
   </section>
 
   <section v-else class="workspace-card">

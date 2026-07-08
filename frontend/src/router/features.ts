@@ -26,6 +26,10 @@ export const roleFeatures: Record<Role, FeatureItem[]> = {
     { key: 'qa', label: '智能问答', description: '基于课程知识库进行问答', icon: 'Bot' },
     { key: 'assignment', label: '在线答题', description: '完成选择、填空、判断和简答题作业', icon: 'PenTool' },
     { key: 'recommendation', label: '练习推荐', description: '输入知识点获取 5 道个性化练习', icon: 'Sparkles' },
+    { key: 'errors', label: '错题本', description: '查看错题收藏，获取错因分析与个性化辅导方案', icon: 'ClipboardCheck' },
+    { key: 'records', label: '学习记录', description: '查看自己的学习活动历史', icon: 'GraduationCap' },
+    { key: 'learning-path', label: '学习路径', description: 'AI 根据薄弱点生成个性化学习路径与计划', icon: 'Bot' },
+    { key: 'agent-report', label: '学习报告', description: 'AI 生成学习报告与改进建议', icon: 'BarChart3' },
     { key: 'feedback', label: '反馈评价', description: '向管理员提交系统使用反馈', icon: 'MessageSquare' }
   ],
   admin: [
@@ -34,6 +38,7 @@ export const roleFeatures: Record<Role, FeatureItem[]> = {
     { key: 'dashboard', label: '可视化看板', description: '查看平台用户、课程、知识库和作业数据', icon: 'BarChart3' },
     { key: 'users', label: '用户信息', description: '查看所有教师和学生注册信息', icon: 'Users' },
     { key: 'courses', label: '课程列表', description: '查看平台课程基础信息', icon: 'Library' },
+    { key: 'sql-agent', label: '数据查询', description: '使用自然语言或 SQL 查询教学数据', icon: 'Bot' },
     { key: 'feedback', label: '反馈回复', description: '接收并回复教师、学生反馈', icon: 'MessageSquareReply' }
   ]
 }

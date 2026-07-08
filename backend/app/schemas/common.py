@@ -199,8 +199,11 @@ class FeedbackReply(BaseModel):
 
 class LessonPlanRequest(BaseModel):
     course_id: int
-    topic: str
-    objectives: str
+    topic: str          # 章节主题，如"勾股定理"
+    grade: str = ""     # 年级，如"八年级"
+    subject: str = ""   # 学科，如"数学"
+    chapter: str = ""   # 章节，如"第十七章 勾股定理"
+    objectives: str     # 教学目标
     duration_minutes: int = 45
 
 
@@ -212,3 +215,52 @@ class RecommendationRequest(BaseModel):
 class AgentRunRequest(BaseModel):
     tool_name: str
     payload: dict[str, Any] = {}
+
+
+# ---- 错题收藏 ----
+class ErrorCreate(BaseModel):
+    question_id: int
+    wrong_answer: str | None = None
+
+
+class ErrorOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    student_id: int
+    question_id: int
+    wrong_answer: str | None
+    created_at: datetime
+    # 附加题目信息
+    stem: str | None = None
+    type: str | None = None
+    answer: str | None = None
+    analysis: str | None = None
+
+
+# ---- 学习记录 ----
+class LearningRecordOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    student_id: int
+    course_id: int
+    activity_type: str
+    detail: dict[str, Any] | None
+    created_at: datetime
+
+
+# ---- 错题分析与辅导方案 ----
+class ErrorAnalysisRequest(BaseModel):
+    course_id: int
+    error_ids: list[int] = []       # 指定错题 ID，留空则分析全部错题
+    include_weak_points: bool = True  # 是否输出薄弱点诊断
+
+
+class TutoringPlanOut(BaseModel):
+    summary: str                          # 总体评价
+    weak_points: list[str] = []           # 薄弱知识点
+    error_analysis: list[dict[str, Any]] = []  # 每题解析
+    suggestions: list[str] = []           # 学习建议
+    practice_plan: list[dict[str, Any]] = []  # 练习计划
+    recommended_questions: list[dict[str, Any]] = []  # 推荐补充练习
