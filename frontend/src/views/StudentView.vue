@@ -77,12 +77,17 @@ async function ask() {
   })
   qa.value.answer = data.answer
   qa.value.session_id = data.session_id
-  // 加载参考页面图片
+  // 加载参考页面图片（用 fetch 带 token，因为 <img> 不会带 auth header）
   const fileId = data.citations?.[0]?.file_id
   if (fileId && data.pages?.length) {
-    qaImages.value = data.pages.map((page: number) =>
-      `/api/knowledge/${courseId.value}/page-image/${fileId}?page=${page}`
-    )
+    const token = localStorage.getItem('token')
+    const urls = await Promise.all(data.pages.map(async (page: number) => {
+      const resp = await fetch(`/api/knowledge/${courseId.value}/page-image/${fileId}?page=${page}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      return URL.createObjectURL(await resp.blob())
+    }))
+    qaImages.value = urls
   }
 }
 
