@@ -36,7 +36,7 @@ async function submit() {
           <input v-model="password" type="password" autocomplete="current-password" />
         </label>
         <button type="submit"><LogIn :size="18" />登录</button>
-        <p v-if="error" class="muted">{{ error }}</p>
+        <p v-if="error" class="login-error">{{ error }}</p>
       </form>
     </section>
   </main>

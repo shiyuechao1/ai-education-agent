@@ -120,6 +120,16 @@ a {
   margin: 0 0 8px;
 }
 
+.login-error {
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  border-radius: 7px;
+  color: #991b1b;
+  font-weight: 600;
+  margin: 0;
+  padding: 10px 14px;
+}
+
 .shell {
   display: grid;
   grid-template-columns: 268px minmax(0, 1fr);
@@ -930,6 +940,46 @@ pre,
   cursor: pointer;
   font-weight: 700;
   padding: 4px 0;
+}
+
+.modal-overlay {
+  align-items: center;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  position: fixed;
+  z-index: 100;
+}
+
+.modal-card {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.25);
+  max-width: 400px;
+  padding: 24px;
+  width: 90%;
+}
+
+.modal-header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.modal-header h3 {
+  margin: 0;
+}
+
+.success-msg {
+  background: #dff4e8;
+  border: 1px solid #bbf7d0;
+  border-radius: 7px;
+  color: #166534;
+  font-weight: 600;
+  margin: 0;
+  padding: 10px 14px;
 }
 
 @media (max-width: 920px) {

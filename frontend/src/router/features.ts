@@ -31,6 +31,7 @@ export const roleFeatures: Record<Role, FeatureItem[]> = {
     { key: 'records', label: '学习记录', description: '查看自己的学习活动历史', icon: 'GraduationCap' },
     { key: 'learning-path', label: '学习路径', description: 'AI 根据薄弱点生成个性化学习路径与计划', icon: 'Bot' },
     { key: 'agent-report', label: '学习报告', description: 'AI 生成学习报告与改进建议', icon: 'BarChart3' },
+    { key: 'voice-qa', label: '语音问答', description: '语音输入问题，AI 基于知识库回答', icon: 'Bot' },
     { key: 'feedback', label: '反馈评价', description: '向管理员提交系统使用反馈', icon: 'MessageSquare' }
   ],
   admin: [

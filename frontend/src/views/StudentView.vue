@@ -31,6 +31,10 @@ const learningPathForm = ref({ student_profile: '', weak_points: '' })
 const learningPathResult = ref<any>(null)
 const reportForm = ref({ topic: '', data: '' })
 const reportResult = ref<any>(null)
+const voiceTranscript = ref('')
+const voiceResult = ref<any>(null)
+const isListening = ref(false)
+let recognition: any = null
 
 const selectedCourse = computed(() => courses.value.find((item) => item.id === courseId.value))
 
@@ -224,6 +228,39 @@ function resultStatusClass(result: any) {
     success: result.is_correct === true,
     danger: result.is_correct === false
   }
+}
+
+function startVoiceInput() {
+  const win = window as any
+  const SpeechRecognition = win.SpeechRecognition || win.webkitSpeechRecognition
+  if (!SpeechRecognition) {
+    alert('你的浏览器不支持语音识别，请用 Chrome 浏览器。')
+    return
+  }
+  recognition = new SpeechRecognition()
+  recognition.lang = 'zh-CN'
+  recognition.interimResults = false
+  recognition.continuous = false
+
+  recognition.onstart = () => { isListening.value = true }
+  recognition.onend = () => { isListening.value = false }
+  recognition.onresult = (event: any) => {
+    voiceTranscript.value = event.results[0][0].transcript
+  }
+  recognition.start()
+}
+
+function stopVoiceInput() {
+  if (recognition) recognition.stop()
+}
+
+async function submitVoiceQA() {
+  if (!courseId.value || !voiceTranscript.value) return
+  const { data } = await api.post('/ai/agent/run', {
+    tool_name: 'streaming_voice_qa',
+    payload: { course_id: courseId.value, transcript: voiceTranscript.value }
+  })
+  voiceResult.value = data.output || data
 }
 
 onMounted(async () => {
@@ -610,6 +647,29 @@ onMounted(async () => {
         </div>
       </div>
       <div v-else class="empty-state">填写报告主题生成学习报告</div>
+    </div>
+  </section>
+
+  <section v-else-if="feature === 'voice-qa'" class="workspace-card">
+    <div class="section-title">
+      <h2>语音问答</h2>
+      <span>说话提问，AI 基于知识库回答</span>
+    </div>
+    <div class="form-grid two">
+      <div class="form-stack">
+        <div class="row">
+          <button :class="{ secondary: isListening }" @click="startVoiceInput" :disabled="isListening">
+            <Bot :size="18" />{{ isListening ? '正在聆听...' : '开始录音' }}
+          </button>
+          <button v-if="isListening" class="danger" @click="stopVoiceInput">停止</button>
+        </div>
+        <textarea v-model="voiceTranscript" placeholder="语音识别结果会显示在这里，你也可以直接打字..." />
+        <button @click="submitVoiceQA" :disabled="!voiceTranscript.trim()"><Bot :size="18" />提交问答</button>
+      </div>
+      <div class="answer-box" v-if="voiceResult">
+        {{ voiceResult.answer || voiceResult.error || JSON.stringify(voiceResult, null, 2) }}
+      </div>
+      <div v-else class="empty-state">点击"开始录音"说出你的问题</div>
     </div>
   </section>
 
