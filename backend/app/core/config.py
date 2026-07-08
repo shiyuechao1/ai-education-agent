@@ -50,6 +50,11 @@ class Settings(BaseSettings):
     # 本地 Embedding 模型名（HuggingFace 格式）
     local_embedding_model: str = "shibing624/text2vec-base-chinese"
 
+    # ========== Redis（可选，缓存 & 限流） ==========
+    redis_host: str = "127.0.0.1"
+    redis_port: int = 6379
+    redis_enabled: bool = True            # 设为 False 可关闭 Redis（Redis 不可用时自动降级）
+
     # ========== 文件上传 ==========
     upload_dir: str = "./app/storage/uploads"
 

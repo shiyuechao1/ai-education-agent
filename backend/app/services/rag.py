@@ -8,15 +8,15 @@ LangChain + ChromaDB RAG 服务。
 4. 使用 Embedding 模型向量化后写入 ChromaDB。
 5. 检索时取 top-k 文档，通过关键词命中重排优先保留最相关的片段。
 6. 若检索不到有效上下文，触发拒答逻辑，避免脱离课程知识库乱答。
-
-Embedding 策略：
-- "local"：使用本地 sentence-transformers 模型（零 API 调用，离线可用）
-- "dashscope"：使用千问 DashScope Embedding API
+7. Redis 语义缓存：相同问题 1 小时内秒回，Redis 不可用时自动降级。
 """
+import hashlib
+import json
 from pathlib import Path
 from typing import Any
 
 from app.core.config import get_settings
+from app.core.redis import cache_get, cache_set
 from app.services.llm import invoke_text
 
 settings = get_settings()
@@ -148,8 +148,17 @@ class RagService:
         """RAG 问答：检索 + 大模型生成回答。
 
         返回：{"answer": str, "citations": list[dict]}
-        如果知识库无相关内容，触发拒答逻辑。
+        Redis 缓存：相同问题 1 小时内秒回，Redis 不可用时自动降级。
         """
+        # 查 Redis 缓存
+        cache_key = f"rag:{course_id}:{hashlib.md5(question.encode()).hexdigest()}"
+        cached = cache_get(cache_key)
+        if cached:
+            try:
+                return json.loads(cached)
+            except json.JSONDecodeError:
+                pass
+
         contexts = self.retrieve(course_id=course_id, question=question)
         if not contexts:
             return {
@@ -166,10 +175,13 @@ class RagService:
             f"资料：\n{context_text}\n"
             "请给出简明回答，并在末尾标注引用编号。"
         )
-        return {
+        result = {
             "answer": invoke_text(prompt),
             "citations": [item["metadata"] for item in contexts],
         }
+        # 写入缓存
+        cache_set(cache_key, json.dumps(result, ensure_ascii=False), ttl_seconds=3600)
+        return result
 
 
 # 全局单例 — 所有 API 模块共用同一实例

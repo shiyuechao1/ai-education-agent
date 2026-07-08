@@ -3,7 +3,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import ensure_course_access, get_current_user
+from app.api.deps import ensure_course_access, get_current_user, make_rate_limiter
 from app.core.database import get_db
 from app.models.entities import ChatMessage, ChatSession, Role, User
 from app.schemas.common import ChatAnswer, ChatAsk
@@ -13,6 +13,8 @@ from app.services.rag import rag_service
 
 
 router = APIRouter(prefix="/qa", tags=["qa"])
+# 智能问答限流：每用户每分钟最多 10 次
+rate_limit_ask = make_rate_limiter("qa:ask", max_calls=10, window_seconds=60)
 
 
 @router.post("/ask", response_model=ChatAnswer)

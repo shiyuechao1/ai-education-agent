@@ -3,8 +3,11 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from fastapi.security import OAuth2PasswordRequestForm
+
+from app.api.deps import get_current_user, oauth2_scheme
 from app.core.database import get_db
+from app.core.redis import blacklist_add
 from app.core.security import create_access_token, get_password_hash, verify_password
 from app.models.entities import User
 from app.schemas.common import PasswordChange, TokenOut, UserOut
@@ -22,6 +25,13 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
         raise HTTPException(status_code=400, detail="用户名或密码错误")
     token = create_access_token(str(user.id), {"role": user.role})
     return TokenOut(access_token=token, role=user.role)
+
+
+@router.post("/logout")
+def logout(token: str = Depends(oauth2_scheme)):
+    """登出：将当前 token 加入黑名单。"""
+    blacklist_add(token)
+    return {"ok": True, "detail": "已登出"}
 
 
 @router.get("/me", response_model=UserOut)
