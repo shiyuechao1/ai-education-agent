@@ -39,7 +39,7 @@ def ask(payload: ChatAsk, current_user: User = Depends(get_current_user), db: Se
     if current_user.role == Role.student:
         record_learning(db, current_user.id, payload.course_id, "qa", {"question": payload.question[:200]})
         db.commit()
-    return ChatAnswer(session_id=session.id, answer=result["answer"], citations=result["citations"])
+    return ChatAnswer(session_id=session.id, answer=result["answer"], citations=result["citations"], pages=result.get("pages", []))
 
 
 @router.post("/ask/stream")
@@ -78,18 +78,32 @@ def ask_stream(payload: ChatAsk, current_user: User = Depends(get_current_user),
     # 收集完整回答（用于保存）
     full_answer: list[str] = []
     citations = [item["metadata"] for item in contexts]
+    # 收集页码图片信息
+    page_images: list[dict] = []
+    seen = set()
+    for item in contexts:
+        fid = item.get("metadata", {}).get("file_id")
+        pg = item.get("page", 0)
+        key = (fid, pg)
+        if fid is not None and key not in seen:
+            seen.add(key)
+            page_images.append({"file_id": fid, "page": pg})
 
     def generate():
         nonlocal full_answer
+        # 1. 先发页面图片信息
+        yield f"data: [PAGES]{json.dumps(page_images)}\n\n"
+        # 2. 流式输出 LLM 回答
         for token in invoke_stream(prompt):
             full_answer.append(token)
             yield f"data: {token}\n\n"
-        # 保存完整回答
+        # 3. 保存到数据库
         answer_text = "".join(full_answer)
-        db.add(ChatMessage(session_id=session_id, role="assistant", content=answer_text, citations=citations))
-        if current_user.role == Role.student:
-            record_learning(db, current_user.id, payload.course_id, "qa", {"question": payload.question[:200]})
-        db.commit()
+        if answer_text.strip():
+            db.add(ChatMessage(session_id=session_id, role="assistant", content=answer_text, citations=citations))
+            if current_user.role == Role.student:
+                record_learning(db, current_user.id, payload.course_id, "qa", {"question": payload.question[:200]})
+            db.commit()
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")

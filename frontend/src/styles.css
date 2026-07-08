@@ -982,6 +982,28 @@ pre,
   padding: 10px 14px;
 }
 
+.page-images {
+  margin-top: 18px;
+}
+
+.page-images h4 {
+  color: #465661;
+  margin: 0 0 10px;
+}
+
+.page-image-card {
+  background: #fff;
+  border: 1px solid #e3ebef;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.page-image-card img {
+  display: block;
+  max-width: 100%;
+}
+
 @media (max-width: 920px) {
   .shell,
   .form-grid.two,

@@ -52,28 +52,26 @@ class RagService:
         result = rag.answer(course_id=1, question="什么是勾股定理")
     """
 
-    def _load_text(self, file_path: str) -> str:
-        """根据文件后缀解析文本。"""
+    def _load_docs(self, file_path: str) -> list:
+        """解析文件为 Document 列表，PDF 保留页码。"""
+        from langchain_core.documents import Document
         path = Path(file_path)
         suffix = path.suffix.lower()
 
         if suffix in {".txt", ".md"}:
-            return path.read_text(encoding="utf-8", errors="ignore")
+            text = path.read_text(encoding="utf-8", errors="ignore")
+            return [Document(page_content=text, metadata={"page": 0})]
 
         if suffix == ".pdf":
             from langchain_community.document_loaders import PyPDFLoader
-
-            return "\n".join(page.page_content for page in PyPDFLoader(str(path)).load())
+            return PyPDFLoader(str(path)).load()
 
         if suffix == ".docx":
             from langchain_community.document_loaders import Docx2txtLoader
+            return Docx2txtLoader(str(path)).load()
 
-            return "\n".join(doc.page_content for doc in Docx2txtLoader(str(path)).load())
-
-        # 兜底：通用文件加载器
         from langchain_community.document_loaders import UnstructuredFileLoader
-
-        return "\n".join(doc.page_content for doc in UnstructuredFileLoader(str(path)).load())
+        return UnstructuredFileLoader(str(path)).load()
 
     def _clean(self, text: str) -> str:
         """基础文本清洗：去空行、去首尾空白。"""
@@ -95,27 +93,36 @@ class RagService:
     # ---------- 公开方法 ----------
 
     def ingest_file(self, *, course_id: int, file_id: int, file_path: str, filename: str) -> int:
-        """将文件解析、分块、写入 ChromaDB。
+        """将文件解析、分块、写入 ChromaDB，PDF 保留页码。
 
-        返回：写入的 chunk 数量；如果未配置 Embedding 则返回 0。
+        返回：写入的 chunk 数量。
         """
         from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-        text = self._clean(self._load_text(file_path))
-        if not text.strip():
+        raw_docs = self._load_docs(file_path)
+        if not raw_docs:
             return 0
 
         splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=80)
-        docs = splitter.create_documents(
-            [text],
-            metadatas=[{
-                "course_id": course_id,
-                "file_id": file_id,
-                "filename": filename,
-            }],
-        )
-        self._vector_store().add_documents(docs)
-        return len(docs)
+        total = 0
+        for doc in raw_docs:
+            text = self._clean(doc.page_content)
+            if not text.strip():
+                continue
+            page = doc.metadata.get("page", 0)
+            chunks = splitter.create_documents(
+                [text],
+                metadatas=[{
+                    "course_id": course_id,
+                    "file_id": file_id,
+                    "filename": filename,
+                    "page": page,
+                }],
+            )
+            if chunks:
+                self._vector_store().add_documents(chunks)
+                total += len(chunks)
+        return total
 
     def retrieve(self, *, course_id: int, question: str, top_k: int = 3) -> list[dict[str, Any]]:
         """从 ChromaDB 检索与问题最相关的课程文档片段。
@@ -139,10 +146,27 @@ class RagService:
             reverse=True,
         )
         return [
-            {"content": doc.page_content, "metadata": doc.metadata}
+            {"content": doc.page_content, "metadata": doc.metadata, "page": doc.metadata.get("page", 0)}
             for doc in ranked[:top_k]
             if doc.page_content.strip()
         ]
+
+    def get_page_image(self, file_path: str, page: int) -> bytes | None:
+        """用 PyMuPDF 渲染 PDF 指定页为 PNG 字节。"""
+        try:
+            import fitz  # PyMuPDF
+            pdf = fitz.open(file_path)
+            if page < 0 or page >= pdf.page_count:
+                pdf.close()
+                return None
+            p = pdf[page]
+            # 720 DPI 高清晰度
+            pix = p.get_pixmap(dpi=200)
+            img_bytes = pix.tobytes("png")
+            pdf.close()
+            return img_bytes
+        except Exception:
+            return None
 
     def answer(self, *, course_id: int, question: str) -> dict[str, Any]:
         """RAG 问答：检索 + 大模型生成回答。
@@ -178,6 +202,7 @@ class RagService:
         result = {
             "answer": invoke_text(prompt),
             "citations": [item["metadata"] for item in contexts],
+            "pages": list(set(item.get("page", 0) for item in contexts)),
         }
         # 写入缓存
         cache_set(cache_key, json.dumps(result, ensure_ascii=False), ttl_seconds=3600)

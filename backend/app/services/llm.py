@@ -39,8 +39,9 @@ def invoke_stream(prompt: str):
         yield "未配置 QWEN_API_KEY，当前返回占位内容。"
         return
     for chunk in model.stream(prompt):
-        if chunk.content:
-            yield chunk.content
+        content = chunk.content
+        if content and isinstance(content, str):
+            yield content
 
 
 def invoke_json(prompt: str, fallback: dict[str, Any]) -> dict[str, Any]:

@@ -176,6 +176,7 @@ class ChatAnswer(BaseModel):
     session_id: int
     answer: str
     citations: list[dict[str, Any]] = []
+    pages: list[int] = []
 
 
 class FeedbackCreate(BaseModel):

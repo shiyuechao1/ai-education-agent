@@ -20,6 +20,7 @@ const answerFileNames = ref<Record<number, string>>({})
 const submissionResult = ref<any>(null)
 const submissionHistory = ref<any[]>([])
 const qa = ref({ question: '', answer: '', session_id: undefined as number | undefined })
+const qaImages = ref<string[]>([])
 const recommend = ref({ knowledge_point: '', result: null as any })
 const feedback = ref({ rating: 5, content: '' })
 const myFeedback = ref<any[]>([])
@@ -67,27 +68,21 @@ async function uploadKnowledge() {
 
 async function ask() {
   if (!courseId.value || !qa.value.question) return
-  qa.value.answer = ''
-  const token = localStorage.getItem('token')
-  const resp = await fetch('/api/qa/ask/stream', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify({ course_id: courseId.value, question: qa.value.question, session_id: qa.value.session_id })
+  qa.value.answer = '思考中...'
+  qaImages.value = []
+  const { data } = await api.post('/qa/ask', {
+    course_id: courseId.value,
+    question: qa.value.question,
+    session_id: qa.value.session_id
   })
-  const reader = resp.body?.getReader()
-  if (!reader) { qa.value.answer = '响应失败'; return }
-  const decoder = new TextDecoder()
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    const text = decoder.decode(value, { stream: true })
-    for (const line of text.split('\n')) {
-      if (line.startsWith('data: ')) {
-        const token = line.slice(6)
-        if (token === '[DONE]') return
-        qa.value.answer += token
-      }
-    }
+  qa.value.answer = data.answer
+  qa.value.session_id = data.session_id
+  // 加载参考页面图片
+  const fileId = data.citations?.[0]?.file_id
+  if (fileId && data.pages?.length) {
+    qaImages.value = data.pages.map((page: number) =>
+      `/api/knowledge/${courseId.value}/page-image/${fileId}?page=${page}`
+    )
   }
 }
 
@@ -334,7 +329,15 @@ onMounted(async () => {
         <textarea v-model="qa.question" placeholder="向课程知识库提问" />
         <button @click="ask"><Send :size="18" />提问</button>
       </div>
-      <div class="answer-box">{{ qa.answer || '回答会显示在这里。' }}</div>
+      <div>
+        <div class="answer-box">{{ qa.answer || '回答会显示在这里。' }}</div>
+        <div v-if="qaImages.length" class="page-images">
+          <h4>📄 参考教材页面</h4>
+          <div v-for="(src, i) in qaImages" :key="i" class="page-image-card">
+            <img :src="src" alt="教材页面" loading="lazy" />
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 

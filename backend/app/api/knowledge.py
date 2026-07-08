@@ -1,8 +1,8 @@
 import shutil
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -110,3 +110,22 @@ def update_student_knowledge_permission(
     member.can_edit_knowledge = can_edit
     db.commit()
     return {"ok": True}
+
+
+@router.get("/{course_id}/page-image/{file_id}")
+def get_page_image(
+    course_id: int,
+    file_id: int,
+    page: int = Query(0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """返回 PDF 指定页的 PNG 截图，用于问答中展示原文。"""
+    ensure_course_access(db, current_user, course_id)
+    record = db.get(KnowledgeFile, file_id)
+    if not record or record.course_id != course_id:
+        raise HTTPException(status_code=404, detail="文件不存在")
+    img = rag_service.get_page_image(record.file_path, page)
+    if img is None:
+        raise HTTPException(status_code=404, detail="页面不存在")
+    return Response(content=img, media_type="image/png")
