@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -7,7 +7,7 @@ from app.api.deps import ensure_course_access, get_current_user, make_rate_limit
 from app.core.database import get_db
 from app.models.entities import ChatMessage, ChatSession, Role, User
 from app.schemas.common import ChatAnswer, ChatAsk
-from app.services.llm import record_learning
+from app.services.llm import invoke_stream, record_learning
 from app.services.pdf_export import export_chat_session_pdf
 from app.services.rag import rag_service
 
@@ -40,6 +40,59 @@ def ask(payload: ChatAsk, current_user: User = Depends(get_current_user), db: Se
         record_learning(db, current_user.id, payload.course_id, "qa", {"question": payload.question[:200]})
         db.commit()
     return ChatAnswer(session_id=session.id, answer=result["answer"], citations=result["citations"])
+
+
+@router.post("/ask/stream")
+def ask_stream(payload: ChatAsk, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """流式问答：SSE 逐字返回，体验更流畅。"""
+    ensure_course_access(db, current_user, payload.course_id)
+
+    # 创建会话
+    session = db.get(ChatSession, payload.session_id) if payload.session_id else None
+    if not session:
+        session = ChatSession(course_id=payload.course_id, user_id=current_user.id, title=payload.question[:80])
+        db.add(session)
+        db.flush()
+    session_id = session.id
+
+    # 检索上下文
+    contexts = rag_service.retrieve(course_id=payload.course_id, question=payload.question)
+    if not contexts:
+        def empty():
+            yield "data: " + "课程知识库中没有找到足够相关的内容，暂时无法基于资料回答该问题。"
+        return StreamingResponse(empty(), media_type="text/event-stream")
+
+    context_text = "\n\n".join(
+        f"[{idx + 1}] {item['content']}" for idx, item in enumerate(contexts)
+    )
+    prompt = (
+        "请只根据课程知识库回答问题。若资料不足，请明确说明不能回答。\n"
+        f"问题：{payload.question}\n"
+        f"资料：\n{context_text}\n"
+        "请给出简明回答，并在末尾标注引用编号。"
+    )
+
+    # 保存用户问题
+    db.add(ChatMessage(session_id=session_id, role="user", content=payload.question))
+
+    # 收集完整回答（用于保存）
+    full_answer: list[str] = []
+    citations = [item["metadata"] for item in contexts]
+
+    def generate():
+        nonlocal full_answer
+        for token in invoke_stream(prompt):
+            full_answer.append(token)
+            yield f"data: {token}\n\n"
+        # 保存完整回答
+        answer_text = "".join(full_answer)
+        db.add(ChatMessage(session_id=session_id, role="assistant", content=answer_text, citations=citations))
+        if current_user.role == Role.student:
+            record_learning(db, current_user.id, payload.course_id, "qa", {"question": payload.question[:200]})
+        db.commit()
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
 
 
 @router.get("/course/{course_id}/sessions")

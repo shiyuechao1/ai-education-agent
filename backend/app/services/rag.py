@@ -105,7 +105,7 @@ class RagService:
         if not text.strip():
             return 0
 
-        splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=120)
+        splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=80)
         docs = splitter.create_documents(
             [text],
             metadatas=[{
@@ -117,7 +117,7 @@ class RagService:
         self._vector_store().add_documents(docs)
         return len(docs)
 
-    def retrieve(self, *, course_id: int, question: str, top_k: int = 5) -> list[dict[str, Any]]:
+    def retrieve(self, *, course_id: int, question: str, top_k: int = 3) -> list[dict[str, Any]]:
         """从 ChromaDB 检索与问题最相关的课程文档片段。
 
         策略：

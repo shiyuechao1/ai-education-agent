@@ -32,6 +32,17 @@ def invoke_text(prompt: str) -> str:
     return model.invoke(prompt).content
 
 
+def invoke_stream(prompt: str):
+    """流式调用 LLM，逐个 yield token。"""
+    model = get_chat_model()
+    if model is None:
+        yield "未配置 QWEN_API_KEY，当前返回占位内容。"
+        return
+    for chunk in model.stream(prompt):
+        if chunk.content:
+            yield chunk.content
+
+
 def invoke_json(prompt: str, fallback: dict[str, Any]) -> dict[str, Any]:
     text = invoke_text(prompt)
     try:

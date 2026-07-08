@@ -67,13 +67,28 @@ async function uploadKnowledge() {
 
 async function ask() {
   if (!courseId.value || !qa.value.question) return
-  const { data } = await api.post('/qa/ask', {
-    course_id: courseId.value,
-    question: qa.value.question,
-    session_id: qa.value.session_id
+  qa.value.answer = ''
+  const token = localStorage.getItem('token')
+  const resp = await fetch('/api/qa/ask/stream', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({ course_id: courseId.value, question: qa.value.question, session_id: qa.value.session_id })
   })
-  qa.value.answer = data.answer
-  qa.value.session_id = data.session_id
+  const reader = resp.body?.getReader()
+  if (!reader) { qa.value.answer = '响应失败'; return }
+  const decoder = new TextDecoder()
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    const text = decoder.decode(value, { stream: true })
+    for (const line of text.split('\n')) {
+      if (line.startsWith('data: ')) {
+        const token = line.slice(6)
+        if (token === '[DONE]') return
+        qa.value.answer += token
+      }
+    }
+  }
 }
 
 async function loadQuestions(assignmentId: number) {
