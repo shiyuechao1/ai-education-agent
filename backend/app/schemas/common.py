@@ -153,6 +153,7 @@ class AnswerResult(BaseModel):
     score: float
     max_score: float
     analysis: str | None = None
+    teacher_comment: str | None = None
 
 
 class SubmissionResult(SubmissionOut):

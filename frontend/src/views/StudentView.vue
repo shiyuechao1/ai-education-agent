@@ -18,9 +18,11 @@ const answers = ref<Record<number, string>>({})
 const answerImages = ref<Record<number, string>>({})
 const answerFileNames = ref<Record<number, string>>({})
 const submissionResult = ref<any>(null)
+const submissionHistory = ref<any[]>([])
 const qa = ref({ question: '', answer: '', session_id: undefined as number | undefined })
 const recommend = ref({ knowledge_point: '', result: null as any })
 const feedback = ref({ rating: 5, content: '' })
+const myFeedback = ref<any[]>([])
 const uploadFile = ref<File | null>(null)
 
 const selectedCourse = computed(() => courses.value.find((item) => item.id === courseId.value))
@@ -40,6 +42,7 @@ async function refreshCourseData() {
   ])
   files.value = knowledgeRes.data
   assignments.value = assignmentRes.data
+  await loadSubmissionHistory()
 }
 
 async function uploadKnowledge() {
@@ -84,6 +87,7 @@ async function submitAssignment() {
     }))
   })
   submissionResult.value = data
+  await loadSubmissionHistory()
 }
 
 async function uploadShortAnswerFile(questionId: number, event: Event) {
@@ -115,6 +119,21 @@ async function recommendQuestions() {
 async function sendFeedback() {
   await api.post('/feedback', feedback.value)
   feedback.value.content = ''
+  await loadMyFeedback()
+}
+
+async function loadMyFeedback() {
+  const { data } = await api.get('/feedback/my')
+  myFeedback.value = data
+}
+
+async function loadSubmissionHistory() {
+  if (!courseId.value) {
+    submissionHistory.value = []
+    return
+  }
+  const { data } = await api.get(`/assignments/my-submissions/course/${courseId.value}`)
+  submissionHistory.value = data
 }
 
 function answered(questionId: number) {
@@ -136,7 +155,17 @@ function resultStatusText(result: any) {
   return result.is_correct ? '正确' : '错误'
 }
 
-onMounted(load)
+function resultStatusClass(result: any) {
+  return {
+    success: result.is_correct === true,
+    danger: result.is_correct === false
+  }
+}
+
+onMounted(async () => {
+  await load()
+  await loadMyFeedback()
+})
 </script>
 
 <template>
@@ -323,6 +352,60 @@ onMounted(load)
     <div v-if="!questions.length" class="empty-state">请选择一份作业开始答题。</div>
   </section>
 
+  <section v-else-if="feature === 'submission-history'" class="workspace-card">
+    <div class="section-title">
+      <h2>作答历史</h2>
+      <span>{{ submissionHistory.length }} 份提交</span>
+    </div>
+    <div v-if="submissionHistory.length" class="submission-list">
+      <article v-for="record in submissionHistory" :key="record.id" class="submission-card">
+        <div class="submission-header">
+          <div>
+            <h3>{{ record.assignment_title }}</h3>
+            <p class="muted">{{ record.assignment_description || '无作业说明' }}</p>
+            <p class="muted">提交时间：{{ record.submitted_at }}</p>
+          </div>
+          <div class="score-pill">总分 {{ record.total_score }}</div>
+        </div>
+
+        <div class="answer-records">
+          <section v-for="answer in record.answers" :key="answer.answer_id" class="answer-record">
+            <div class="answer-record-head">
+              <span class="badge">{{ questionTypeName(answer.type) }}</span>
+              <span class="badge" :class="resultStatusClass(answer)">{{ resultStatusText(answer) }}</span>
+              <strong>{{ answer.score }} / {{ answer.max_score }} 分</strong>
+            </div>
+            <p class="question-stem">{{ answer.stem }}</p>
+            <div class="answer-meta">
+              <div>
+                <span>我的答案</span>
+                <p>{{ answer.student_answer || '未作答' }}</p>
+                <button
+                  v-if="answer.image_path"
+                  class="secondary"
+                  type="button"
+                  @click="openProtectedFile(answer.image_path)"
+                >
+                  查看上传文件
+                </button>
+              </div>
+              <div>
+                <span>参考答案</span>
+                <p>{{ answer.reference_answer }}</p>
+              </div>
+              <div>
+                <span>教师批阅</span>
+                <p>{{ answer.teacher_comment || (answer.type === 'short' ? '教师暂未批阅' : '自动判分') }}</p>
+              </div>
+            </div>
+            <div class="reply-box">解析：{{ answer.analysis || '无' }}</div>
+          </section>
+        </div>
+      </article>
+    </div>
+    <div v-else class="empty-state">当前课程暂无历史作答记录。</div>
+  </section>
+
   <section v-else-if="feature === 'recommendation'" class="workspace-card">
     <div class="section-title">
       <h2>题目推荐</h2>
@@ -346,6 +429,20 @@ onMounted(load)
       <input v-model.number="feedback.rating" type="number" min="1" max="5" />
       <textarea v-model="feedback.content" placeholder="向管理员反馈系统体验" />
       <button @click="sendFeedback"><MessageSquare :size="18" />提交反馈</button>
+    </div>
+    <div class="feedback-history">
+      <h3>我的反馈记录</h3>
+      <div v-if="myFeedback.length" class="feedback-list">
+        <article v-for="item in myFeedback" :key="item.id" class="feedback-record">
+          <div class="feedback-record-head">
+            <span class="badge">评分 {{ item.rating }}</span>
+            <span class="muted">{{ item.created_at }}</span>
+          </div>
+          <p>{{ item.content }}</p>
+          <div class="reply-box">管理员回复：{{ item.reply || '暂未回复' }}</div>
+        </article>
+      </div>
+      <div v-else class="empty-state">暂无反馈记录。</div>
     </div>
   </section>
 </template>

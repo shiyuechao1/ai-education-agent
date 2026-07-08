@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -21,3 +22,15 @@ def create_feedback(
     db.commit()
     db.refresh(feedback)
     return feedback
+
+
+@router.get("/my", response_model=list[FeedbackOut])
+def my_feedback(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return db.scalars(
+        select(Feedback)
+        .where(Feedback.user_id == current_user.id)
+        .order_by(Feedback.created_at.desc())
+    ).all()
