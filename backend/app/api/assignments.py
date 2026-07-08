@@ -200,6 +200,55 @@ def list_assignments(
     return db.scalars(select(Assignment).where(Assignment.course_id == course_id).order_by(Assignment.created_at.desc())).all()
 
 
+@router.get("/my-submissions/course/{course_id}")
+def list_my_submission_history(
+    course_id: int,
+    current_user: User = Depends(require_roles(Role.student)),
+    db: Session = Depends(get_db),
+):
+    ensure_course_access(db, current_user, course_id)
+    rows = db.execute(
+        select(Submission, Assignment, Answer, Question)
+        .join(Assignment, Assignment.id == Submission.assignment_id)
+        .join(Answer, Answer.submission_id == Submission.id)
+        .join(Question, Question.id == Answer.question_id)
+        .where(
+            Assignment.course_id == course_id,
+            Submission.student_id == current_user.id,
+        )
+        .order_by(Submission.submitted_at.desc(), Assignment.id, Question.id)
+    ).all()
+    grouped: dict[int, dict] = {}
+    for submission, assignment, answer, question in rows:
+        if submission.id not in grouped:
+            grouped[submission.id] = {
+                "id": submission.id,
+                "assignment_id": assignment.id,
+                "assignment_title": assignment.title,
+                "assignment_description": assignment.description,
+                "total_score": submission.total_score,
+                "submitted_at": submission.submitted_at,
+                "answers": [],
+            }
+        grouped[submission.id]["answers"].append(
+            {
+                "answer_id": answer.id,
+                "question_id": question.id,
+                "type": question.type,
+                "stem": question.stem,
+                "student_answer": answer.content,
+                "image_path": answer.image_path,
+                "reference_answer": question.answer,
+                "is_correct": answer.is_correct,
+                "score": answer.score,
+                "max_score": question.score,
+                "analysis": question.analysis,
+                "teacher_comment": answer.teacher_comment,
+            }
+        )
+    return list(grouped.values())
+
+
 @router.get("/{assignment_id}/questions", response_model=list[QuestionOut])
 def assignment_questions(
     assignment_id: int,
@@ -300,6 +349,7 @@ def submit_assignment(
                 "score": score,
                 "max_score": question.score,
                 "analysis": question.analysis,
+                "teacher_comment": None,
             }
         )
     submission.total_score = total

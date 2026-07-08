@@ -25,6 +25,7 @@ export const roleFeatures: Record<Role, FeatureItem[]> = {
     { key: 'knowledge', label: '知识库浏览', description: '查看、下载教师上传的课程资料', icon: 'FolderOpen' },
     { key: 'qa', label: '智能问答', description: '基于课程知识库进行问答', icon: 'Bot' },
     { key: 'assignment', label: '在线答题', description: '完成选择、填空、判断和简答题作业', icon: 'PenTool' },
+    { key: 'submission-history', label: '作答历史', description: '查看历史作答与教师批阅', icon: 'ClipboardCheck' },
     { key: 'recommendation', label: '练习推荐', description: '输入知识点获取 5 道个性化练习', icon: 'Sparkles' },
     { key: 'errors', label: '错题本', description: '查看错题收藏，获取错因分析与个性化辅导方案', icon: 'ClipboardCheck' },
     { key: 'records', label: '学习记录', description: '查看自己的学习活动历史', icon: 'GraduationCap' },

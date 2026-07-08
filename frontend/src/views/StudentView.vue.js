@@ -16,9 +16,11 @@ const answers = ref({});
 const answerImages = ref({});
 const answerFileNames = ref({});
 const submissionResult = ref(null);
+const submissionHistory = ref([]);
 const qa = ref({ question: '', answer: '', session_id: undefined });
 const recommend = ref({ knowledge_point: '', result: null });
 const feedback = ref({ rating: 5, content: '' });
+const myFeedback = ref([]);
 const uploadFile = ref(null);
 const selectedCourse = computed(() => courses.value.find((item) => item.id === courseId.value));
 async function load() {
@@ -36,6 +38,7 @@ async function refreshCourseData() {
     ]);
     files.value = knowledgeRes.data;
     assignments.value = assignmentRes.data;
+    await loadSubmissionHistory();
 }
 async function uploadKnowledge() {
     if (!courseId.value || !uploadFile.value)
@@ -79,6 +82,7 @@ async function submitAssignment() {
         }))
     });
     submissionResult.value = data;
+    await loadSubmissionHistory();
 }
 async function uploadShortAnswerFile(questionId, event) {
     const file = event.target.files?.[0];
@@ -108,6 +112,19 @@ async function recommendQuestions() {
 async function sendFeedback() {
     await api.post('/feedback', feedback.value);
     feedback.value.content = '';
+    await loadMyFeedback();
+}
+async function loadMyFeedback() {
+    const { data } = await api.get('/feedback/my');
+    myFeedback.value = data;
+}
+async function loadSubmissionHistory() {
+    if (!courseId.value) {
+        submissionHistory.value = [];
+        return;
+    }
+    const { data } = await api.get(`/assignments/my-submissions/course/${courseId.value}`);
+    submissionHistory.value = data;
 }
 function answered(questionId) {
     return Boolean(answers.value[questionId]);
@@ -126,7 +143,16 @@ function resultStatusText(result) {
         return '待教师批改';
     return result.is_correct ? '正确' : '错误';
 }
-onMounted(load);
+function resultStatusClass(result) {
+    return {
+        success: result.is_correct === true,
+        danger: result.is_correct === false
+    };
+}
+onMounted(async () => {
+    await load();
+    await loadMyFeedback();
+});
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
@@ -590,6 +616,121 @@ else if (__VLS_ctx.feature === 'assignment') {
         });
     }
 }
+else if (__VLS_ctx.feature === 'submission-history') {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
+        ...{ class: "workspace-card" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "section-title" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.h2, __VLS_intrinsicElements.h2)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    (__VLS_ctx.submissionHistory.length);
+    if (__VLS_ctx.submissionHistory.length) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "submission-list" },
+        });
+        for (const [record] of __VLS_getVForSourceType((__VLS_ctx.submissionHistory))) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.article, __VLS_intrinsicElements.article)({
+                key: (record.id),
+                ...{ class: "submission-card" },
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+                ...{ class: "submission-header" },
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.h3, __VLS_intrinsicElements.h3)({});
+            (record.assignment_title);
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+                ...{ class: "muted" },
+            });
+            (record.assignment_description || '无作业说明');
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+                ...{ class: "muted" },
+            });
+            (record.submitted_at);
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+                ...{ class: "score-pill" },
+            });
+            (record.total_score);
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+                ...{ class: "answer-records" },
+            });
+            for (const [answer] of __VLS_getVForSourceType((record.answers))) {
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
+                    key: (answer.answer_id),
+                    ...{ class: "answer-record" },
+                });
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+                    ...{ class: "answer-record-head" },
+                });
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                    ...{ class: "badge" },
+                });
+                (__VLS_ctx.questionTypeName(answer.type));
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                    ...{ class: "badge" },
+                    ...{ class: (__VLS_ctx.resultStatusClass(answer)) },
+                });
+                (__VLS_ctx.resultStatusText(answer));
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+                (answer.score);
+                (answer.max_score);
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+                    ...{ class: "question-stem" },
+                });
+                (answer.stem);
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+                    ...{ class: "answer-meta" },
+                });
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({});
+                (answer.student_answer || '未作答');
+                if (answer.image_path) {
+                    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+                        ...{ onClick: (...[$event]) => {
+                                if (!!(__VLS_ctx.feature === 'courses'))
+                                    return;
+                                if (!!(__VLS_ctx.feature === 'knowledge'))
+                                    return;
+                                if (!!(__VLS_ctx.feature === 'qa'))
+                                    return;
+                                if (!!(__VLS_ctx.feature === 'assignment'))
+                                    return;
+                                if (!(__VLS_ctx.feature === 'submission-history'))
+                                    return;
+                                if (!(__VLS_ctx.submissionHistory.length))
+                                    return;
+                                if (!(answer.image_path))
+                                    return;
+                                __VLS_ctx.openProtectedFile(answer.image_path);
+                            } },
+                        ...{ class: "secondary" },
+                        type: "button",
+                    });
+                }
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({});
+                (answer.reference_answer);
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({});
+                (answer.teacher_comment || (answer.type === 'short' ? '教师暂未批阅' : '自动判分'));
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+                    ...{ class: "reply-box" },
+                });
+                (answer.analysis || '无');
+            }
+        }
+    }
+    else {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "empty-state" },
+        });
+    }
+}
 else if (__VLS_ctx.feature === 'recommendation') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
         ...{ class: "workspace-card" },
@@ -658,6 +799,43 @@ else {
     const __VLS_22 = __VLS_21({
         size: (18),
     }, ...__VLS_functionalComponentArgsRest(__VLS_21));
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "feedback-history" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.h3, __VLS_intrinsicElements.h3)({});
+    if (__VLS_ctx.myFeedback.length) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "feedback-list" },
+        });
+        for (const [item] of __VLS_getVForSourceType((__VLS_ctx.myFeedback))) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.article, __VLS_intrinsicElements.article)({
+                key: (item.id),
+                ...{ class: "feedback-record" },
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+                ...{ class: "feedback-record-head" },
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                ...{ class: "badge" },
+            });
+            (item.rating);
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                ...{ class: "muted" },
+            });
+            (item.created_at);
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({});
+            (item.content);
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+                ...{ class: "reply-box" },
+            });
+            (item.reply || '暂未回复');
+        }
+    }
+    else {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "empty-state" },
+        });
+    }
 }
 /** @type {__VLS_StyleScopedClasses['workspace-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['section-title']} */ ;
@@ -704,6 +882,24 @@ else {
 /** @type {__VLS_StyleScopedClasses['empty-state']} */ ;
 /** @type {__VLS_StyleScopedClasses['workspace-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['section-title']} */ ;
+/** @type {__VLS_StyleScopedClasses['submission-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['submission-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['submission-header']} */ ;
+/** @type {__VLS_StyleScopedClasses['muted']} */ ;
+/** @type {__VLS_StyleScopedClasses['muted']} */ ;
+/** @type {__VLS_StyleScopedClasses['score-pill']} */ ;
+/** @type {__VLS_StyleScopedClasses['answer-records']} */ ;
+/** @type {__VLS_StyleScopedClasses['answer-record']} */ ;
+/** @type {__VLS_StyleScopedClasses['answer-record-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['question-stem']} */ ;
+/** @type {__VLS_StyleScopedClasses['answer-meta']} */ ;
+/** @type {__VLS_StyleScopedClasses['secondary']} */ ;
+/** @type {__VLS_StyleScopedClasses['reply-box']} */ ;
+/** @type {__VLS_StyleScopedClasses['empty-state']} */ ;
+/** @type {__VLS_StyleScopedClasses['workspace-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['section-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['two']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-stack']} */ ;
@@ -711,6 +907,14 @@ else {
 /** @type {__VLS_StyleScopedClasses['section-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-stack']} */ ;
 /** @type {__VLS_StyleScopedClasses['compact']} */ ;
+/** @type {__VLS_StyleScopedClasses['feedback-history']} */ ;
+/** @type {__VLS_StyleScopedClasses['feedback-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['feedback-record']} */ ;
+/** @type {__VLS_StyleScopedClasses['feedback-record-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['muted']} */ ;
+/** @type {__VLS_StyleScopedClasses['reply-box']} */ ;
+/** @type {__VLS_StyleScopedClasses['empty-state']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {
@@ -732,9 +936,11 @@ const __VLS_self = (await import('vue')).defineComponent({
             answers: answers,
             answerFileNames: answerFileNames,
             submissionResult: submissionResult,
+            submissionHistory: submissionHistory,
             qa: qa,
             recommend: recommend,
             feedback: feedback,
+            myFeedback: myFeedback,
             uploadFile: uploadFile,
             selectedCourse: selectedCourse,
             refreshCourseData: refreshCourseData,
@@ -749,6 +955,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             answered: answered,
             questionTypeName: questionTypeName,
             resultStatusText: resultStatusText,
+            resultStatusClass: resultStatusClass,
         };
     },
 });

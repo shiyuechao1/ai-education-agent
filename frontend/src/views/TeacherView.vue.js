@@ -9,6 +9,9 @@ const courses = ref([]);
 const courseId = ref();
 const files = ref([]);
 const assignments = ref([]);
+const assignmentPickerBankId = ref();
+const assignmentPickerQuestions = ref([]);
+const selectedAssignmentQuestionIds = ref([]);
 const selectedRecordAssignmentId = ref();
 const submissionRecords = ref([]);
 const gradingDrafts = ref({});
@@ -18,6 +21,7 @@ const selectedBankId = ref();
 const selectedQuestionBankId = ref();
 const bankQuestions = ref([]);
 const feedback = ref({ rating: 5, content: '' });
+const myFeedback = ref([]);
 const lesson = ref({ topic: '', objectives: '', duration_minutes: 45 });
 const lessonResult = ref(null);
 const bank = ref({
@@ -68,7 +72,11 @@ async function refreshCourseData() {
     if (!questionBanks.value.some((item) => item.id === selectedQuestionBankId.value)) {
         selectedQuestionBankId.value = questionBanks.value[0]?.id;
     }
+    if (!questionBanks.value.some((item) => item.id === assignmentPickerBankId.value)) {
+        assignmentPickerBankId.value = questionBanks.value[0]?.id;
+    }
     await loadBankQuestions();
+    await loadAssignmentPickerQuestions();
 }
 async function uploadKnowledge() {
     if (!courseId.value || !uploadFile.value)
@@ -208,11 +216,28 @@ async function createAssignment() {
         course_id: courseId.value,
         title: assignment.value.title,
         description: assignment.value.description,
-        question_ids: assignment.value.question_ids.split(',').map((id) => Number(id.trim())).filter(Boolean)
+        question_ids: selectedAssignmentQuestionIds.value
     });
     assignment.value.title = '';
-    assignment.value.question_ids = '';
+    assignment.value.description = '';
+    selectedAssignmentQuestionIds.value = [];
     await refreshCourseData();
+}
+async function loadAssignmentPickerQuestions(bankId = assignmentPickerBankId.value) {
+    if (!bankId) {
+        assignmentPickerQuestions.value = [];
+        return;
+    }
+    assignmentPickerBankId.value = bankId;
+    const { data } = await api.get(`/assignments/banks/${bankId}/questions`);
+    assignmentPickerQuestions.value = data;
+}
+function toggleAssignmentQuestion(questionId) {
+    if (selectedAssignmentQuestionIds.value.includes(questionId)) {
+        selectedAssignmentQuestionIds.value = selectedAssignmentQuestionIds.value.filter((id) => id !== questionId);
+        return;
+    }
+    selectedAssignmentQuestionIds.value = [...selectedAssignmentQuestionIds.value, questionId];
 }
 async function loadSubmissionRecords(assignmentId = selectedRecordAssignmentId.value) {
     if (!assignmentId) {
@@ -268,8 +293,16 @@ function answerStatusClass(answer) {
 async function sendFeedback() {
     await api.post('/feedback', feedback.value);
     feedback.value.content = '';
+    await loadMyFeedback();
 }
-onMounted(load);
+async function loadMyFeedback() {
+    const { data } = await api.get('/feedback/my');
+    myFeedback.value = data;
+}
+onMounted(async () => {
+    await load();
+    await loadMyFeedback();
+});
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
@@ -830,7 +863,7 @@ else if (__VLS_ctx.feature === 'assignments') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
     (__VLS_ctx.assignments.length);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "form-grid two" },
+        ...{ class: "assignment-builder" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "form-stack" },
@@ -843,12 +876,13 @@ else if (__VLS_ctx.feature === 'assignments') {
         value: (__VLS_ctx.assignment.description),
         placeholder: "作业说明",
     });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-        placeholder: "题目 ID，用英文逗号分隔",
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "selected-answer" },
     });
-    (__VLS_ctx.assignment.question_ids);
+    (__VLS_ctx.selectedAssignmentQuestionIds.length);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
         ...{ onClick: (__VLS_ctx.createAssignment) },
+        disabled: (!__VLS_ctx.assignment.title || !__VLS_ctx.selectedAssignmentQuestionIds.length),
     });
     const __VLS_24 = {}.Send;
     /** @type {[typeof __VLS_components.Send, ]} */ ;
@@ -859,6 +893,103 @@ else if (__VLS_ctx.feature === 'assignments') {
     const __VLS_26 = __VLS_25({
         size: (18),
     }, ...__VLS_functionalComponentArgsRest(__VLS_25));
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "assignment-question-picker" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.aside, __VLS_intrinsicElements.aside)({
+        ...{ class: "bank-list" },
+    });
+    for (const [item] of __VLS_getVForSourceType((__VLS_ctx.questionBanks))) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ onClick: (...[$event]) => {
+                    if (!!(__VLS_ctx.feature === 'courses'))
+                        return;
+                    if (!!(__VLS_ctx.feature === 'knowledge'))
+                        return;
+                    if (!!(__VLS_ctx.feature === 'lesson'))
+                        return;
+                    if (!!(__VLS_ctx.feature === 'question-bank-create'))
+                        return;
+                    if (!!(__VLS_ctx.feature === 'question-add'))
+                        return;
+                    if (!!(__VLS_ctx.feature === 'question-bank-view'))
+                        return;
+                    if (!(__VLS_ctx.feature === 'assignments'))
+                        return;
+                    __VLS_ctx.loadAssignmentPickerQuestions(item.id);
+                } },
+            key: (item.id),
+            ...{ class: "bank-button" },
+            ...{ class: ({ active: __VLS_ctx.assignmentPickerBankId === item.id }) },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+        (item.name);
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+        (item.question_count);
+    }
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "question-list" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "bank-summary" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+        ...{ class: "eyebrow" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.h3, __VLS_intrinsicElements.h3)({});
+    (__VLS_ctx.questionBanks.find((item) => item.id === __VLS_ctx.assignmentPickerBankId)?.name || '暂无题库');
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "badge success" },
+    });
+    if (__VLS_ctx.assignmentPickerQuestions.length) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "selectable-question-list" },
+        });
+        for (const [question] of __VLS_getVForSourceType((__VLS_ctx.assignmentPickerQuestions))) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+                ...{ onClick: (...[$event]) => {
+                        if (!!(__VLS_ctx.feature === 'courses'))
+                            return;
+                        if (!!(__VLS_ctx.feature === 'knowledge'))
+                            return;
+                        if (!!(__VLS_ctx.feature === 'lesson'))
+                            return;
+                        if (!!(__VLS_ctx.feature === 'question-bank-create'))
+                            return;
+                        if (!!(__VLS_ctx.feature === 'question-add'))
+                            return;
+                        if (!!(__VLS_ctx.feature === 'question-bank-view'))
+                            return;
+                        if (!(__VLS_ctx.feature === 'assignments'))
+                            return;
+                        if (!(__VLS_ctx.assignmentPickerQuestions.length))
+                            return;
+                        __VLS_ctx.toggleAssignmentQuestion(question.id);
+                    } },
+                key: (question.id),
+                type: "button",
+                ...{ class: "selectable-question" },
+                ...{ class: ({ selected: __VLS_ctx.selectedAssignmentQuestionIds.includes(question.id) }) },
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                ...{ class: "badge" },
+            });
+            (__VLS_ctx.questionTypeName(question.type));
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+            (question.id);
+            (question.stem);
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
+            (question.score);
+            (question.answer);
+        }
+    }
+    else {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "empty-state" },
+        });
+    }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.table, __VLS_intrinsicElements.table)({
         ...{ class: "table" },
     });
@@ -1130,6 +1261,43 @@ else {
     const __VLS_30 = __VLS_29({
         size: (18),
     }, ...__VLS_functionalComponentArgsRest(__VLS_29));
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "feedback-history" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.h3, __VLS_intrinsicElements.h3)({});
+    if (__VLS_ctx.myFeedback.length) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "feedback-list" },
+        });
+        for (const [item] of __VLS_getVForSourceType((__VLS_ctx.myFeedback))) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.article, __VLS_intrinsicElements.article)({
+                key: (item.id),
+                ...{ class: "feedback-record" },
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+                ...{ class: "feedback-record-head" },
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                ...{ class: "badge" },
+            });
+            (item.rating);
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                ...{ class: "muted" },
+            });
+            (item.created_at);
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({});
+            (item.content);
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+                ...{ class: "reply-box" },
+            });
+            (item.reply || '暂未回复');
+        }
+    }
+    else {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "empty-state" },
+        });
+    }
 }
 /** @type {__VLS_StyleScopedClasses['workspace-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['section-title']} */ ;
@@ -1186,9 +1354,21 @@ else {
 /** @type {__VLS_StyleScopedClasses['empty-state']} */ ;
 /** @type {__VLS_StyleScopedClasses['workspace-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['section-title']} */ ;
-/** @type {__VLS_StyleScopedClasses['form-grid']} */ ;
-/** @type {__VLS_StyleScopedClasses['two']} */ ;
+/** @type {__VLS_StyleScopedClasses['assignment-builder']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-stack']} */ ;
+/** @type {__VLS_StyleScopedClasses['selected-answer']} */ ;
+/** @type {__VLS_StyleScopedClasses['assignment-question-picker']} */ ;
+/** @type {__VLS_StyleScopedClasses['bank-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['bank-button']} */ ;
+/** @type {__VLS_StyleScopedClasses['question-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['bank-summary']} */ ;
+/** @type {__VLS_StyleScopedClasses['eyebrow']} */ ;
+/** @type {__VLS_StyleScopedClasses['badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['success']} */ ;
+/** @type {__VLS_StyleScopedClasses['selectable-question-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['selectable-question']} */ ;
+/** @type {__VLS_StyleScopedClasses['badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['empty-state']} */ ;
 /** @type {__VLS_StyleScopedClasses['table']} */ ;
 /** @type {__VLS_StyleScopedClasses['workspace-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['section-title']} */ ;
@@ -1215,6 +1395,14 @@ else {
 /** @type {__VLS_StyleScopedClasses['section-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-stack']} */ ;
 /** @type {__VLS_StyleScopedClasses['compact']} */ ;
+/** @type {__VLS_StyleScopedClasses['feedback-history']} */ ;
+/** @type {__VLS_StyleScopedClasses['feedback-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['feedback-record']} */ ;
+/** @type {__VLS_StyleScopedClasses['feedback-record-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['muted']} */ ;
+/** @type {__VLS_StyleScopedClasses['reply-box']} */ ;
+/** @type {__VLS_StyleScopedClasses['empty-state']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {
@@ -1230,6 +1418,9 @@ const __VLS_self = (await import('vue')).defineComponent({
             courseId: courseId,
             files: files,
             assignments: assignments,
+            assignmentPickerBankId: assignmentPickerBankId,
+            assignmentPickerQuestions: assignmentPickerQuestions,
+            selectedAssignmentQuestionIds: selectedAssignmentQuestionIds,
             submissionRecords: submissionRecords,
             gradingDrafts: gradingDrafts,
             sessions: sessions,
@@ -1238,6 +1429,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             selectedQuestionBankId: selectedQuestionBankId,
             bankQuestions: bankQuestions,
             feedback: feedback,
+            myFeedback: myFeedback,
             lesson: lesson,
             lessonResult: lessonResult,
             bank: bank,
@@ -1261,6 +1453,8 @@ const __VLS_self = (await import('vue')).defineComponent({
             questionTypeName: questionTypeName,
             formatOptions: formatOptions,
             createAssignment: createAssignment,
+            loadAssignmentPickerQuestions: loadAssignmentPickerQuestions,
+            toggleAssignmentQuestion: toggleAssignmentQuestion,
             loadSubmissionRecords: loadSubmissionRecords,
             gradeShortAnswer: gradeShortAnswer,
             openProtectedFile: openProtectedFile,

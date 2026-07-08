@@ -11,6 +11,9 @@ const courses = ref<Course[]>([])
 const courseId = ref<number>()
 const files = ref<any[]>([])
 const assignments = ref<any[]>([])
+const assignmentPickerBankId = ref<number>()
+const assignmentPickerQuestions = ref<any[]>([])
+const selectedAssignmentQuestionIds = ref<number[]>([])
 const selectedRecordAssignmentId = ref<number>()
 const submissionRecords = ref<any[]>([])
 const gradingDrafts = ref<Record<number, { score: number; teacher_comment: string }>>({})
@@ -21,6 +24,7 @@ const selectedQuestionBankId = ref<number>()
 const bankQuestions = ref<any[]>([])
 const feedback = ref({ rating: 5, content: '' })
 const lesson = ref({ topic: '', grade: '', subject: '', chapter: '', objectives: '', duration_minutes: 45 })
+const myFeedback = ref<any[]>([])
 const lessonResult = ref<any>(null)
 const bank = ref({
   name: '默认题库',
@@ -72,7 +76,11 @@ async function refreshCourseData() {
   if (!questionBanks.value.some((item) => item.id === selectedQuestionBankId.value)) {
     selectedQuestionBankId.value = questionBanks.value[0]?.id
   }
+  if (!questionBanks.value.some((item) => item.id === assignmentPickerBankId.value)) {
+    assignmentPickerBankId.value = questionBanks.value[0]?.id
+  }
   await loadBankQuestions()
+  await loadAssignmentPickerQuestions()
 }
 
 async function uploadKnowledge() {
@@ -217,11 +225,30 @@ async function createAssignment() {
     course_id: courseId.value,
     title: assignment.value.title,
     description: assignment.value.description,
-    question_ids: assignment.value.question_ids.split(',').map((id) => Number(id.trim())).filter(Boolean)
+    question_ids: selectedAssignmentQuestionIds.value
   })
   assignment.value.title = ''
-  assignment.value.question_ids = ''
+  assignment.value.description = ''
+  selectedAssignmentQuestionIds.value = []
   await refreshCourseData()
+}
+
+async function loadAssignmentPickerQuestions(bankId = assignmentPickerBankId.value) {
+  if (!bankId) {
+    assignmentPickerQuestions.value = []
+    return
+  }
+  assignmentPickerBankId.value = bankId
+  const { data } = await api.get(`/assignments/banks/${bankId}/questions`)
+  assignmentPickerQuestions.value = data
+}
+
+function toggleAssignmentQuestion(questionId: number) {
+  if (selectedAssignmentQuestionIds.value.includes(questionId)) {
+    selectedAssignmentQuestionIds.value = selectedAssignmentQuestionIds.value.filter((id) => id !== questionId)
+    return
+  }
+  selectedAssignmentQuestionIds.value = [...selectedAssignmentQuestionIds.value, questionId]
 }
 
 async function loadSubmissionRecords(assignmentId = selectedRecordAssignmentId.value) {
@@ -280,9 +307,18 @@ function answerStatusClass(answer: any) {
 async function sendFeedback() {
   await api.post('/feedback', feedback.value)
   feedback.value.content = ''
+  await loadMyFeedback()
 }
 
-onMounted(load)
+async function loadMyFeedback() {
+  const { data } = await api.get('/feedback/my')
+  myFeedback.value = data
+}
+
+onMounted(async () => {
+  await load()
+  await loadMyFeedback()
+})
 </script>
 
 <template>
@@ -586,13 +622,57 @@ onMounted(load)
       <h2>作业发布</h2>
       <span>{{ assignments.length }} 份作业</span>
     </div>
-    <div class="form-grid two">
+    <div class="assignment-builder">
       <div class="form-stack">
         <input v-model="assignment.title" placeholder="作业标题" />
         <textarea v-model="assignment.description" placeholder="作业说明" />
-        <input v-model="assignment.question_ids" placeholder="题目 ID，用英文逗号分隔" />
-        <button @click="createAssignment"><Send :size="18" />发布作业</button>
+        <div class="selected-answer">已选择 {{ selectedAssignmentQuestionIds.length }} 道题</div>
+        <button :disabled="!assignment.title || !selectedAssignmentQuestionIds.length" @click="createAssignment">
+          <Send :size="18" />发布作业
+        </button>
       </div>
+
+      <div class="assignment-question-picker">
+        <aside class="bank-list">
+          <div
+            v-for="item in questionBanks"
+            :key="item.id"
+            class="bank-button"
+            :class="{ active: assignmentPickerBankId === item.id }"
+            @click="loadAssignmentPickerQuestions(item.id)"
+          >
+            <span>
+              <strong>{{ item.name }}</strong>
+              <span>{{ item.question_count }} 道题</span>
+            </span>
+          </div>
+        </aside>
+        <div class="question-list">
+          <div class="bank-summary">
+            <div>
+              <p class="eyebrow">点击题目进行选择</p>
+              <h3>{{ questionBanks.find((item) => item.id === assignmentPickerBankId)?.name || '暂无题库' }}</h3>
+            </div>
+            <span class="badge success">跨题库选择</span>
+          </div>
+          <div v-if="assignmentPickerQuestions.length" class="selectable-question-list">
+            <button
+              v-for="question in assignmentPickerQuestions"
+              :key="question.id"
+              type="button"
+              class="selectable-question"
+              :class="{ selected: selectedAssignmentQuestionIds.includes(question.id) }"
+              @click="toggleAssignmentQuestion(question.id)"
+            >
+              <span class="badge">{{ questionTypeName(question.type) }}</span>
+              <strong>#{{ question.id }} {{ question.stem }}</strong>
+              <small>{{ question.score }} 分 · 答案：{{ question.answer }}</small>
+            </button>
+          </div>
+          <div v-else class="empty-state">请选择含有题目的题库。</div>
+        </div>
+      </div>
+
       <table class="table">
         <tbody>
           <tr v-for="item in assignments" :key="item.id">
@@ -703,6 +783,20 @@ onMounted(load)
       <input v-model.number="feedback.rating" type="number" min="1" max="5" />
       <textarea v-model="feedback.content" placeholder="向管理员反馈系统体验" />
       <button @click="sendFeedback"><MessageSquare :size="18" />提交反馈</button>
+    </div>
+    <div class="feedback-history">
+      <h3>我的反馈记录</h3>
+      <div v-if="myFeedback.length" class="feedback-list">
+        <article v-for="item in myFeedback" :key="item.id" class="feedback-record">
+          <div class="feedback-record-head">
+            <span class="badge">评分 {{ item.rating }}</span>
+            <span class="muted">{{ item.created_at }}</span>
+          </div>
+          <p>{{ item.content }}</p>
+          <div class="reply-box">管理员回复：{{ item.reply || '暂未回复' }}</div>
+        </article>
+      </div>
+      <div v-else class="empty-state">暂无反馈记录。</div>
     </div>
   </section>
 </template>
