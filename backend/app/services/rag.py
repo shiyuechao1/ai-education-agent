@@ -2,9 +2,9 @@
 LangChain + ChromaDB RAG 服务。
 
 处理流程：
-1. 解析上传资料，按文件类型提取文本（PDF / Word / TXT / MD）。
+1. 解析上传资料，按文件类型提取文本（PDF 使用 pdfplumber 保留表格 / Word / TXT / MD）。
 2. 清洗空白字符与异常片段。
-3. 使用 RecursiveCharacterTextSplitter 分块（chunk_size=800, overlap=120）。
+3. 使用 RecursiveCharacterTextSplitter 分块（chunk_size=1200, overlap=200，优先按段落/句号切分）。
 4. 使用 Embedding 模型向量化后写入 ChromaDB。
 5. 检索时取 top-k 文档，通过关键词命中重排优先保留最相关的片段。
 6. 若检索不到有效上下文，触发拒答逻辑，避免脱离课程知识库乱答。
@@ -63,8 +63,29 @@ class RagService:
             return [Document(page_content=text, metadata={"page": 0})]
 
         if suffix == ".pdf":
-            from langchain_community.document_loaders import PyPDFLoader
-            return PyPDFLoader(str(path)).load()
+            import pdfplumber
+
+            docs: list[Document] = []
+            with pdfplumber.open(str(path)) as pdf:
+                for page_num, page in enumerate(pdf.pages):
+                    text = page.extract_text() or ""
+                    # 提取表格，拼接到文本中
+                    tables = page.extract_tables()
+                    table_lines: list[str] = []
+                    for tbl in tables:
+                        if tbl:
+                            for row in tbl:
+                                row_text = " | ".join(cell or "" for cell in row)
+                                table_lines.append(row_text)
+                    if table_lines:
+                        text += "\n" + "\n".join(table_lines)
+                    if text.strip():
+                        docs.append(Document(
+                            page_content=text,
+                            metadata={"page": page_num},
+                        ))
+            pdf.close()
+            return docs
 
         if suffix == ".docx":
             from langchain_community.document_loaders import Docx2txtLoader
@@ -103,7 +124,10 @@ class RagService:
         if not raw_docs:
             return 0
 
-        splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=80)
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1200, chunk_overlap=200,
+            separators=["\n\n", "\n", "。", ".", " ", ""],
+        )
         total = 0
         for doc in raw_docs:
             text = self._clean(doc.page_content)
@@ -160,8 +184,8 @@ class RagService:
                 pdf.close()
                 return None
             p = pdf[page]
-            # 720 DPI 高清晰度
-            pix = p.get_pixmap(dpi=200)
+            # 300 DPI 兼顾清晰度与性能
+            pix = p.get_pixmap(dpi=300)
             img_bytes = pix.tobytes("png")
             pdf.close()
             return img_bytes
