@@ -329,10 +329,10 @@ onMounted(async () => {
       <h2>智能问答</h2>
       <span>基于课程知识库</span>
     </div>
-    <div class="form-grid two">
+    <div class="form-grid two" style="align-items: start;">
       <div class="form-stack">
-        <textarea v-model="qa.question" placeholder="向课程知识库提问" />
-        <button @click="ask"><Send :size="18" />提问</button>
+        <textarea v-model="qa.question" placeholder="向课程知识库提问" rows="3" style="resize: vertical; min-height: 60px;" />
+        <button @click="ask" style="align-self: start;"><Send :size="18" />提问</button>
       </div>
       <div>
         <div class="answer-box">{{ qa.answer || '回答会显示在这里。' }}</div>
