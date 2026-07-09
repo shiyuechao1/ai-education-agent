@@ -2,7 +2,7 @@
 技术要求如下： 
 1. 前端用vue完成
 2. 后端用python的fastapi完成
-3. 数据库使用mysql数据库，root的密码为33550336
+3. 数据库使用mysql数据库，root的密码为xxx
 4. 模型使用千问大模型，api key为xxx
 5. rag实现使用langchain框架，向量数据库使用milvus
 6. agent使用mcp技术
